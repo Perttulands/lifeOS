@@ -22,6 +22,7 @@ class AIFeature(Enum):
     ENERGY_PREDICTION = "energy_prediction"
     PATTERN_DETECTION = "pattern_detection"
     CAPTURE = "capture"
+    GOAL_BREAKDOWN = "goal_breakdown"
     OTHER = "other"
 
 
