@@ -104,6 +104,10 @@ def verify_backup(backup_path: Path) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_valid, message)
     """
+    # Check file exists first
+    if not backup_path.exists():
+        return False, f"Backup file not found: {backup_path}"
+
     try:
         conn = sqlite3.connect(str(backup_path))
         cursor = conn.cursor()

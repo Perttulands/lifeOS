@@ -113,12 +113,6 @@ docker compose restart
 
 SQLite database is stored in a Docker volume (`lifeos-data`). Your data persists across container restarts.
 
-To backup:
-```bash
-docker compose exec lifeos cp /data/lifeos.db /data/backup.db
-docker cp lifeos:/data/backup.db ./backup.db
-```
-
 ### Environment Variables
 
 | Variable | Required | Default | Description |
@@ -203,6 +197,73 @@ Or via API:
 ```bash
 curl -X POST http://localhost:8080/api/weekly-review/deliver
 ```
+
+## Database Backup & Restore
+
+LifeOS includes automated backup/restore functionality for your SQLite database.
+
+### Automated Daily Backup
+
+Set up a cron job for daily backups:
+
+```bash
+# Daily backup at 2 AM
+0 2 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.backup
+```
+
+### Manual Commands
+
+```bash
+# Create a backup
+python -m src.jobs.backup
+
+# List all backups
+python -m src.jobs.backup --list
+
+# Restore the latest backup
+python -m src.jobs.backup --restore latest
+
+# Restore a specific backup
+python -m src.jobs.backup --restore 2026-02-03_020000
+
+# Verify a backup
+python -m src.jobs.backup --verify 2026-02-03_020000
+
+# Remove backups older than 7 days (keeps minimum 3)
+python -m src.jobs.backup --prune 7
+```
+
+### API Endpoints
+
+```bash
+# Get backup status
+curl http://localhost:8080/api/backup/status
+
+# List all backups
+curl http://localhost:8080/api/backup/list
+
+# Create a new backup
+curl -X POST http://localhost:8080/api/backup/create
+
+# Restore from backup
+curl -X POST http://localhost:8080/api/backup/restore \
+  -H "Content-Type: application/json" \
+  -d '{"backup_id": "latest"}'
+```
+
+### Docker Backup
+
+For Docker deployments:
+
+```bash
+# Create backup inside container
+docker compose exec lifeos python -m src.jobs.backup
+
+# Copy backup to host
+docker cp lifeos:/app/backups/lifeos_2026-02-03_020000.db ./backup.db
+```
+
+Backups are stored in the `backups/` directory with automatic integrity verification.
 
 ## Stack
 
