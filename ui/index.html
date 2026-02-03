@@ -36,6 +36,12 @@
             <div class="header-right">
                 <div class="greeting" id="greeting">Good morning</div>
                 <div class="date" id="currentDate">Sunday, Feb 2</div>
+                <button class="settings-btn" id="settingsBtn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -260,6 +266,126 @@
                 </div>
             </section>
         </main>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal glass-card">
+                <div class="modal-header">
+                    <h2 class="modal-title">Settings</h2>
+                    <button class="modal-close" id="closeSettings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Profile Section -->
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Profile</h3>
+                        <div class="settings-field">
+                            <label class="settings-label" for="userName">Name</label>
+                            <input type="text" class="settings-input" id="userName" placeholder="Your name">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label" for="userTimezone">Timezone</label>
+                            <select class="settings-select" id="userTimezone">
+                                <option value="UTC">UTC</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <!-- Notifications Section -->
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Notifications</h3>
+                        <div class="settings-field toggle-field">
+                            <div class="toggle-info">
+                                <span class="settings-label">Quiet Hours</span>
+                                <span class="settings-hint">Pause notifications during sleep</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="quietHoursEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-field time-range" id="quietHoursRange">
+                            <div class="time-input-group">
+                                <label class="settings-label" for="quietHoursStart">From</label>
+                                <input type="time" class="settings-input time-input" id="quietHoursStart" value="23:00">
+                            </div>
+                            <span class="time-separator">to</span>
+                            <div class="time-input-group">
+                                <label class="settings-label" for="quietHoursEnd">Until</label>
+                                <input type="time" class="settings-input time-input" id="quietHoursEnd" value="08:00">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Integrations Section -->
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Integrations</h3>
+                        <div class="integration-list">
+                            <div class="integration-item">
+                                <div class="integration-icon oura">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <circle cx="12" cy="12" r="6"/>
+                                        <circle cx="12" cy="12" r="2"/>
+                                    </svg>
+                                </div>
+                                <div class="integration-info">
+                                    <span class="integration-name">Oura Ring</span>
+                                    <span class="integration-status" id="ouraStatus">Not configured</span>
+                                </div>
+                            </div>
+                            <div class="integration-item">
+                                <div class="integration-icon ai">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                                    </svg>
+                                </div>
+                                <div class="integration-info">
+                                    <span class="integration-name">AI Engine</span>
+                                    <span class="integration-status" id="aiStatus">Not configured</span>
+                                </div>
+                                <span class="integration-model" id="aiModel"></span>
+                            </div>
+                            <div class="integration-item">
+                                <div class="integration-icon telegram">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                    </svg>
+                                </div>
+                                <div class="integration-info">
+                                    <span class="integration-name">Telegram</span>
+                                    <span class="integration-status" id="telegramStatus">Not configured</span>
+                                </div>
+                            </div>
+                            <div class="integration-item">
+                                <div class="integration-icon discord">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 12a1 1 0 100-2 1 1 0 000 2zm6 0a1 1 0 100-2 1 1 0 000 2z"/>
+                                        <path d="M7.5 7.5c3.5-1 5.5-1 9 0M7.5 16.5c3.5 1 5.5 1 9 0"/>
+                                        <path d="M15.5 17c0 1 1.5 3 2 3 1.5 0 2.83-1.67 3.5-3 .67-1.33.5-5.67-1-11-.17-.33-1-1.67-2.5-2-1 0-2.17.33-3.5 1m-6 12c0 1-1.5 3-2 3-1.5 0-2.83-1.67-3.5-3-.67-1.33-.5-5.67 1-11 .17-.33 1-1.67 2.5-2 1 0 2.17.33 3.5 1"/>
+                                    </svg>
+                                </div>
+                                <div class="integration-info">
+                                    <span class="integration-name">Discord</span>
+                                    <span class="integration-status" id="discordStatus">Not configured</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="settings-note">
+                            Configure API keys in your <code>.env</code> file.
+                            <a href="https://github.com/Perttulands/lifeOS#configuration" target="_blank">Learn more</a>
+                        </p>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
+                    <button class="btn btn-primary" id="saveSettings">Save Changes</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Toast Container -->
         <div class="toast-container" id="toastContainer"></div>
