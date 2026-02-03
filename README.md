@@ -26,18 +26,41 @@ Most self-management tools demand more than they give. LifeOS inverts this:
 git clone https://github.com/Perttulands/lifeOS.git
 cd lifeOS
 
-# Setup
-cp .env.example .env
-# Add your OURA_TOKEN to .env
+# Run setup script (creates venv, installs deps, inits db)
+./setup.sh
 
-# Install
-pip install -r requirements.txt
+# Edit .env with your API tokens
+nano .env  # Add OURA_TOKEN and LITELLM_API_KEY
 
-# Run
+# Activate virtual environment and run
+source .venv/bin/activate
 python -m uvicorn src.api:app --reload --port 8080
 ```
 
 Open http://localhost:8080
+
+### Manual Setup
+
+If you prefer manual setup:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Setup environment
+cp .env.example .env
+# Edit .env and add your tokens
+
+# Initialize database
+python -c "from src.database import init_db; from src.models import *; init_db()"
+
+# Run
+python -m uvicorn src.api:app --reload --port 8080
+```
 
 ## Docker Deployment
 
