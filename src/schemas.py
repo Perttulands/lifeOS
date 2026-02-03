@@ -445,3 +445,124 @@ class VoiceNoteStatusResponse(BaseModel):
     whisper_configured: bool
     supported_formats: List[str]
     max_file_size_mb: int
+
+
+# === Goal Tracking Schemas ===
+
+class MilestoneCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    estimated_hours: Optional[float] = None
+    target_date: Optional[str] = None
+
+
+class MilestoneUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None  # pending, in_progress, completed, skipped
+    estimated_hours: Optional[float] = None
+    actual_hours: Optional[float] = None
+    target_date: Optional[str] = None
+
+
+class MilestoneResponse(BaseModel):
+    id: int
+    goal_id: int
+    title: str
+    description: Optional[str]
+    order: int
+    status: str
+    completed_at: Optional[str]
+    estimated_hours: Optional[float]
+    actual_hours: float
+    target_date: Optional[str]
+    source: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class GoalCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    target_date: Optional[str] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+    auto_breakdown: bool = True  # Whether to auto-generate milestones with AI
+
+
+class GoalUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    target_date: Optional[str] = None
+    status: Optional[str] = None  # active, completed, paused, abandoned
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class GoalResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    target_date: Optional[str]
+    status: str
+    progress: float
+    estimated_hours: Optional[float]
+    actual_hours: float
+    velocity: Optional[float]
+    predicted_completion: Optional[str]
+    category: Optional[str]
+    tags: List[str]
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class GoalDetailResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    target_date: Optional[str]
+    status: str
+    progress: float
+    estimated_hours: Optional[float]
+    actual_hours: float
+    velocity: Optional[float]
+    predicted_completion: Optional[str]
+    category: Optional[str]
+    tags: List[str]
+    milestones: List[MilestoneResponse]
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class GoalBreakdownRequest(BaseModel):
+    regenerate: bool = False  # Force regenerate even if breakdown exists
+
+
+class GoalBreakdownResponse(BaseModel):
+    goal_id: int
+    milestones_created: int
+    estimated_total_hours: float
+    message: str
+
+
+class LogProgressRequest(BaseModel):
+    hours: float
+    notes: Optional[str] = None
+
+
+class GoalProgressResponse(BaseModel):
+    goal_id: int
+    progress: float
+    actual_hours: float
+    velocity: Optional[float]
+    predicted_completion: Optional[str]
+    milestones_completed: int
+    milestones_total: int

@@ -120,19 +120,85 @@ class JournalEntry(Base):
 
 
 class Goal(Base):
-    """Goal tracking."""
+    """
+    Goal tracking with milestones and velocity-based progress.
+
+    Goals are broken down into milestones by AI. Progress is calculated
+    from milestone completion, and timeline adapts based on actual velocity.
+    """
     __tablename__ = "goals"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, default=1)
     title = Column(String(200), nullable=False)
     description = Column(Text)
-    target_date = Column(String(10))
-    status = Column(String(20), default="active")  # active, completed, paused, abandoned
-    progress = Column(Float, default=0.0)          # 0-100
+    target_date = Column(String(10))              # YYYY-MM-DD
+    status = Column(String(20), default="active") # active, completed, paused, abandoned
+    progress = Column(Float, default=0.0)         # 0-100 (calculated from milestones)
+
+    # Velocity tracking
+    estimated_hours = Column(Float)               # AI-estimated total effort
+    actual_hours = Column(Float, default=0.0)     # Logged hours worked
+    velocity = Column(Float)                      # Calculated: milestones/week
+    predicted_completion = Column(String(10))     # YYYY-MM-DD based on velocity
+
+    # AI breakdown
+    ai_breakdown = Column(JSON, default=dict)     # Raw AI response for reference
+    breakdown_generated_at = Column(DateTime)     # When AI breakdown was created
+
+    # Categorization
+    category = Column(String(50))                 # health, career, learning, personal, etc.
+    tags = Column(JSON, default=list)
+
     extra_data = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_goal_status', 'status'),
+        Index('idx_goal_category', 'category'),
+    )
+
+
+class Milestone(Base):
+    """
+    Goal milestones - actionable steps toward a goal.
+
+    Created by AI breakdown or manually. Progress on milestones
+    determines goal progress and informs velocity calculations.
+    """
+    __tablename__ = "milestones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, default=1)
+
+    title = Column(String(300), nullable=False)
+    description = Column(Text)
+    order = Column(Integer, default=0)            # Sequence within goal
+
+    # Status tracking
+    status = Column(String(20), default="pending")  # pending, in_progress, completed, skipped
+    completed_at = Column(DateTime)
+
+    # Effort tracking
+    estimated_hours = Column(Float)               # AI-estimated effort
+    actual_hours = Column(Float, default=0.0)     # Logged hours
+
+    # Deadline
+    target_date = Column(String(10))              # YYYY-MM-DD
+
+    # AI-generated or manual
+    source = Column(String(20), default="ai")     # ai, manual
+
+    extra_data = Column("metadata", JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_milestone_goal', 'goal_id'),
+        Index('idx_milestone_status', 'status'),
+    )
 
 
 class Task(Base):

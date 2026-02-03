@@ -29,6 +29,7 @@ from .routers import (
     voice_router,
     onboarding_router,
     journal_router,
+    goals_router,
 )
 
 
@@ -65,6 +66,7 @@ app.include_router(backfill_router)
 app.include_router(voice_router)
 app.include_router(onboarding_router)
 app.include_router(journal_router)
+app.include_router(goals_router)
 
 
 # === Startup ===

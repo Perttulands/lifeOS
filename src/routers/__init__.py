@@ -19,6 +19,7 @@ from .backfill import router as backfill_router
 from .voice import router as voice_router
 from .onboarding import router as onboarding_router
 from .journal import router as journal_router
+from .goals import router as goals_router
 
 __all__ = [
     "health_router",
@@ -36,4 +37,5 @@ __all__ = [
     "voice_router",
     "onboarding_router",
     "journal_router",
+    "goals_router",
 ]
