@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeOS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Ambient background glow -->
+        <div class="ambient-glow"></div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon">
+                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                            <circle cx="14" cy="14" r="12" stroke="url(#logoGradient)" stroke-width="2"/>
+                            <circle cx="14" cy="14" r="6" fill="url(#logoGradient)"/>
+                            <defs>
+                                <linearGradient id="logoGradient" x1="0" y1="0" x2="28" y2="28">
+                                    <stop offset="0%" stop-color="#818cf8"/>
+                                    <stop offset="100%" stop-color="#6366f1"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </span>
+                    <span class="logo-text">LifeOS</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="greeting" id="greeting">Good morning</div>
+                <div class="date" id="currentDate">Sunday, Feb 2</div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Daily Brief Section -->
+            <section class="brief-section" id="briefSection">
+                <div class="brief-card glass-card">
+                    <div class="brief-header">
+                        <div class="brief-icon-wrapper">
+                            <span class="brief-icon" id="briefIcon">&#127749;</span>
+                        </div>
+                        <div class="brief-meta">
+                            <span class="brief-label">Daily Brief</span>
+                            <span class="brief-time" id="briefTime">Generated at 7:00 AM</span>
+                        </div>
+                        <button class="refresh-btn" id="refreshBrief" title="Refresh brief">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                                <path d="M21 3v5h-5"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="brief-content" id="briefContent">
+                        <p class="brief-text">Loading your personalized brief...</p>
+                    </div>
+                    <div class="brief-footer">
+                        <div class="brief-tags" id="briefTags">
+                            <!-- Tags will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Score Cards Grid -->
+            <section class="scores-section">
+                <div class="scores-grid">
+                    <!-- Sleep Card -->
+                    <div class="score-card glass-card" id="sleepCard" data-type="sleep">
+                        <div class="score-header">
+                            <div class="score-icon sleep-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                                </svg>
+                            </div>
+                            <span class="score-label">Sleep</span>
+                        </div>
+                        <div class="score-body">
+                            <div class="score-value" id="sleepValue">
+                                <span class="value-main">--</span>
+                                <span class="value-unit">h</span>
+                            </div>
+                            <div class="score-quality" id="sleepQuality">
+                                <span class="quality-bar"></span>
+                                <span class="quality-label">Loading</span>
+                            </div>
+                        </div>
+                        <div class="score-footer">
+                            <div class="score-sparkline" id="sleepSparkline">
+                                <!-- SVG sparkline will be inserted -->
+                            </div>
+                            <div class="score-delta" id="sleepDelta">
+                                <span class="delta-indicator"></span>
+                                <span class="delta-text">vs avg</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Readiness Card -->
+                    <div class="score-card glass-card" id="readinessCard" data-type="readiness">
+                        <div class="score-header">
+                            <div class="score-icon readiness-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                                </svg>
+                            </div>
+                            <span class="score-label">Readiness</span>
+                        </div>
+                        <div class="score-body">
+                            <div class="score-value" id="readinessValue">
+                                <span class="value-main">--</span>
+                            </div>
+                            <div class="score-quality" id="readinessQuality">
+                                <span class="quality-bar"></span>
+                                <span class="quality-label">Loading</span>
+                            </div>
+                        </div>
+                        <div class="score-footer">
+                            <div class="score-sparkline" id="readinessSparkline">
+                                <!-- SVG sparkline will be inserted -->
+                            </div>
+                            <div class="score-delta" id="readinessDelta">
+                                <span class="delta-indicator"></span>
+                                <span class="delta-text">vs avg</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Energy Card (Self-Reported) -->
+                    <div class="score-card glass-card energy-card" id="energyCard" data-type="energy">
+                        <div class="score-header">
+                            <div class="score-icon energy-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                </svg>
+                            </div>
+                            <span class="score-label">Energy</span>
+                            <span class="score-badge">Self</span>
+                        </div>
+                        <div class="score-body">
+                            <div class="energy-display" id="energyDisplay">
+                                <div class="energy-dots">
+                                    <span class="energy-dot" data-level="1"></span>
+                                    <span class="energy-dot" data-level="2"></span>
+                                    <span class="energy-dot" data-level="3"></span>
+                                    <span class="energy-dot" data-level="4"></span>
+                                    <span class="energy-dot" data-level="5"></span>
+                                </div>
+                                <span class="energy-level" id="energyLevel">Not logged</span>
+                            </div>
+                        </div>
+                        <div class="score-footer">
+                            <div class="score-sparkline" id="energySparkline">
+                                <!-- SVG sparkline will be inserted -->
+                            </div>
+                            <div class="score-delta" id="energyDelta">
+                                <span class="delta-text">Log below</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trend Section -->
+            <section class="trend-section">
+                <div class="trend-card glass-card">
+                    <div class="trend-header">
+                        <h3 class="trend-title">7-Day Sleep Trend</h3>
+                        <div class="trend-tabs">
+                            <button class="trend-tab active" data-metric="sleep">Sleep</button>
+                            <button class="trend-tab" data-metric="readiness">Readiness</button>
+                            <button class="trend-tab" data-metric="energy">Energy</button>
+                        </div>
+                    </div>
+                    <div class="trend-chart" id="trendChart">
+                        <!-- Chart will be rendered here -->
+                        <div class="chart-loading">
+                            <div class="chart-skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="trend-legend" id="trendLegend">
+                        <!-- Legend will be inserted -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Insights Section -->
+            <section class="insights-section" id="insightsSection">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <span class="title-icon">&#10024;</span>
+                        Insights
+                    </h3>
+                </div>
+                <div class="insights-list" id="insightsList">
+                    <!-- Insight cards will be inserted -->
+                    <div class="insight-card glass-card skeleton">
+                        <div class="insight-skeleton-line"></div>
+                        <div class="insight-skeleton-line short"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Log Section -->
+            <section class="quicklog-section">
+                <div class="quicklog-card glass-card">
+                    <div class="quicklog-header">
+                        <h3 class="quicklog-title">Quick Log</h3>
+                        <span class="quicklog-hint">How are you feeling?</span>
+                    </div>
+                    <div class="quicklog-body">
+                        <div class="energy-selector" id="energySelector">
+                            <button class="energy-btn" data-value="1" title="Very Low">
+                                <span class="energy-emoji">&#128564;</span>
+                                <span class="energy-label">1</span>
+                            </button>
+                            <button class="energy-btn" data-value="2" title="Low">
+                                <span class="energy-emoji">&#128532;</span>
+                                <span class="energy-label">2</span>
+                            </button>
+                            <button class="energy-btn" data-value="3" title="Moderate">
+                                <span class="energy-emoji">&#128528;</span>
+                                <span class="energy-label">3</span>
+                            </button>
+                            <button class="energy-btn" data-value="4" title="Good">
+                                <span class="energy-emoji">&#128578;</span>
+                                <span class="energy-label">4</span>
+                            </button>
+                            <button class="energy-btn" data-value="5" title="Excellent">
+                                <span class="energy-emoji">&#129321;</span>
+                                <span class="energy-label">5</span>
+                            </button>
+                        </div>
+                        <div class="note-input-wrapper">
+                            <textarea
+                                class="note-input"
+                                id="noteInput"
+                                placeholder="Add a note... (optional)"
+                                rows="2"
+                            ></textarea>
+                        </div>
+                        <button class="log-submit" id="logSubmit" disabled>
+                            <span class="submit-text">Log</span>
+                            <span class="submit-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
