@@ -36,7 +36,7 @@ class InsightsService:
         if not dp:
             return None
 
-        meta = dp.metadata or {}
+        meta = dp.extra_data or {}
         return SleepData(
             date=dp.date,
             duration_hours=dp.value or 0,
@@ -80,7 +80,7 @@ class InsightsService:
             DataPoint.date == date,
             DataPoint.type == "calendar"
         ).first()
-        calendar_events = calendar_dp.metadata.get('events', []) if calendar_dp else []
+        calendar_events = calendar_dp.extra_data.get('events', []) if calendar_dp else []
 
         return DayContext(
             date=date,
@@ -121,7 +121,7 @@ class InsightsService:
                 'date': dp.date,
                 'type': dp.type,
                 'value': dp.value,
-                'metadata': dp.metadata
+                'metadata': dp.extra_data
             }
             for dp in dps
         ]
