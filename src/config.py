@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     quiet_hours_end: str = Field(default="08:00", alias="QUIET_HOURS_END")
     quiet_hours_enabled: bool = Field(default=True, alias="QUIET_HOURS_ENABLED")
 
+    # Google Calendar OAuth2
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str = Field(
+        default="http://localhost:8080/api/calendar/callback",
+        alias="GOOGLE_REDIRECT_URI"
+    )
+
     # Database
     database_url: str = Field(
         default="sqlite:///./lifeos.db",
