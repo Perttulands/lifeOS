@@ -5,6 +5,9 @@
 import { CONFIG, settingsState } from './config.js';
 import { showToast } from './utils.js';
 
+// Track active backfill polling
+let backfillPollInterval = null;
+
 /**
  * Setup all settings-related event listeners
  */
@@ -33,6 +36,17 @@ export function setupSettingsListeners() {
             closeSettings();
         }
     });
+
+    // Backfill buttons
+    const backfillOuraBtn = document.getElementById('backfillOuraBtn');
+    const backfillCalendarBtn = document.getElementById('backfillCalendarBtn');
+
+    if (backfillOuraBtn) {
+        backfillOuraBtn.addEventListener('click', () => startBackfill('oura'));
+    }
+    if (backfillCalendarBtn) {
+        backfillCalendarBtn.addEventListener('click', () => startBackfill('calendar'));
+    }
 }
 
 /**
@@ -82,6 +96,9 @@ export async function openSettings() {
 
     // Load token stats in background
     loadTokenStats();
+
+    // Load backfill status
+    loadBackfillStatus();
 }
 
 /**
@@ -213,6 +230,7 @@ export function closeSettings() {
     const modal = document.getElementById('settingsModal');
     modal.classList.remove('visible');
     document.body.style.overflow = '';
+    stopBackfillPolling();
 }
 
 /**
@@ -252,5 +270,163 @@ export async function saveSettings() {
     } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = 'Save Changes';
+    }
+}
+
+/**
+ * Load and display backfill status
+ */
+async function loadBackfillStatus() {
+    try {
+        const res = await fetch(`${CONFIG.API_BASE}/backfill/status`);
+        if (!res.ok) throw new Error('Failed to load backfill status');
+
+        const data = await res.json();
+        const summary = data.data_summary;
+
+        // Update record counts
+        document.getElementById('ouraRecordCount').textContent =
+            `${summary.oura?.record_count?.toLocaleString() || 0} records`;
+        document.getElementById('calendarEventCount').textContent =
+            `${summary.calendar?.event_count?.toLocaleString() || 0} events`;
+
+        // Check if any backfill is in progress
+        if (data.in_progress?.oura) {
+            showBackfillProgress('oura', data.in_progress.oura);
+            startBackfillPolling('oura');
+        } else if (data.in_progress?.calendar) {
+            showBackfillProgress('calendar', data.in_progress.calendar);
+            startBackfillPolling('calendar');
+        } else {
+            hideBackfillProgress();
+        }
+    } catch (error) {
+        console.error('Failed to load backfill status:', error);
+        document.getElementById('ouraRecordCount').textContent = '-- records';
+        document.getElementById('calendarEventCount').textContent = '-- events';
+    }
+}
+
+/**
+ * Start a backfill operation
+ */
+async function startBackfill(source) {
+    const ouraBtn = document.getElementById('backfillOuraBtn');
+    const calendarBtn = document.getElementById('backfillCalendarBtn');
+
+    // Disable buttons
+    ouraBtn.disabled = true;
+    calendarBtn.disabled = true;
+
+    try {
+        const endpoint = source === 'oura'
+            ? `${CONFIG.API_BASE}/backfill/oura?days=90`
+            : `${CONFIG.API_BASE}/backfill/calendar?days_back=90&days_forward=30`;
+
+        const res = await fetch(endpoint, { method: 'POST' });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || 'Failed to start backfill');
+        }
+
+        const progress = await res.json();
+        showBackfillProgress(source, progress);
+        startBackfillPolling(source);
+
+        showToast(`Started ${source} import`, 'success');
+    } catch (error) {
+        console.error('Failed to start backfill:', error);
+        showToast(error.message || 'Failed to start import', 'error');
+        ouraBtn.disabled = false;
+        calendarBtn.disabled = false;
+    }
+}
+
+/**
+ * Show backfill progress UI
+ */
+function showBackfillProgress(source, progress) {
+    const container = document.getElementById('backfillProgress');
+    const label = document.getElementById('backfillProgressLabel');
+    const percent = document.getElementById('backfillProgressPercent');
+    const fill = document.getElementById('backfillProgressFill');
+    const detail = document.getElementById('backfillProgressDetail');
+
+    container.style.display = 'block';
+
+    const sourceName = source === 'oura' ? 'Oura' : 'Calendar';
+    label.textContent = `Importing ${sourceName} data...`;
+    percent.textContent = `${Math.round(progress.percent_complete)}%`;
+    fill.style.width = `${progress.percent_complete}%`;
+
+    if (progress.current_date) {
+        detail.textContent = `Processing: ${progress.current_date} | ${progress.records_synced} records`;
+    } else {
+        detail.textContent = `${progress.records_synced} records synced`;
+    }
+}
+
+/**
+ * Hide backfill progress UI
+ */
+function hideBackfillProgress() {
+    const container = document.getElementById('backfillProgress');
+    if (container) {
+        container.style.display = 'none';
+    }
+
+    // Re-enable buttons
+    const ouraBtn = document.getElementById('backfillOuraBtn');
+    const calendarBtn = document.getElementById('backfillCalendarBtn');
+    if (ouraBtn) ouraBtn.disabled = false;
+    if (calendarBtn) calendarBtn.disabled = false;
+}
+
+/**
+ * Start polling for backfill progress
+ */
+function startBackfillPolling(source) {
+    // Clear any existing poll
+    if (backfillPollInterval) {
+        clearInterval(backfillPollInterval);
+    }
+
+    backfillPollInterval = setInterval(async () => {
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/backfill/progress/${source}`);
+            if (!res.ok) throw new Error('Failed to get progress');
+
+            const progress = await res.json();
+
+            if (progress.status === 'completed' || progress.status === 'failed' || progress.status === 'partial') {
+                // Backfill finished
+                clearInterval(backfillPollInterval);
+                backfillPollInterval = null;
+
+                if (progress.status === 'completed' || progress.status === 'partial') {
+                    showToast(`${source === 'oura' ? 'Oura' : 'Calendar'} import complete: ${progress.records_synced} records`, 'success');
+                } else {
+                    showToast(`Import failed: ${progress.errors?.[0] || 'Unknown error'}`, 'error');
+                }
+
+                hideBackfillProgress();
+                loadBackfillStatus(); // Refresh counts
+            } else if (progress.status === 'in_progress') {
+                showBackfillProgress(source, progress);
+            }
+        } catch (error) {
+            console.error('Failed to poll backfill progress:', error);
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+/**
+ * Stop backfill polling (called when modal closes)
+ */
+function stopBackfillPolling() {
+    if (backfillPollInterval) {
+        clearInterval(backfillPollInterval);
+        backfillPollInterval = null;
     }
 }
