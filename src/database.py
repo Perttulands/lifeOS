@@ -4,13 +4,10 @@ LifeOS Database
 SQLite database with async support via aiosqlite.
 """
 
-from datetime import datetime
-from typing import Optional
-import json
+from typing import Generator
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 
 from .config import settings
 
@@ -27,7 +24,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """Dependency for getting database sessions."""
     db = SessionLocal()
     try:
@@ -36,7 +33,7 @@ def get_db():
         db.close()
 
 
-def init_db():
+def init_db() -> None:
     """Initialize database tables."""
     # Import all models to ensure they're registered with Base
     from . import models  # noqa: F401

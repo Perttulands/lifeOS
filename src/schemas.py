@@ -2,87 +2,116 @@
 LifeOS API Schemas
 
 Pydantic models for API request/response validation.
+Includes OpenAPI documentation via Field descriptions and examples.
 """
 
-from typing import Optional, List, Dict
-from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 
 # === Health Schemas ===
 
 class ServiceCheckResponse(BaseModel):
-    name: str
-    status: str
-    message: str
-    latency_ms: Optional[float] = None
+    """Health check result for a single service."""
+    name: str = Field(..., description="Service name", examples=["database"])
+    status: str = Field(..., description="Status: healthy, degraded, unhealthy, unknown")
+    message: str = Field(..., description="Human-readable status message")
+    latency_ms: Optional[float] = Field(None, description="Response latency in milliseconds")
 
 
 class HealthResponse(BaseModel):
-    status: str
-    version: str
-    timestamp: str
+    """Basic health check response."""
+    status: str = Field(..., description="Overall system status")
+    version: str = Field(..., description="API version", examples=["0.1.0"])
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
 
 
 class DetailedHealthResponse(BaseModel):
-    status: str
-    version: str
-    uptime_seconds: float
-    started_at: str
-    timestamp: str
-    services: Dict[str, ServiceCheckResponse]
-    recent_errors: List[Dict]
+    """Detailed health report with all service statuses."""
+    status: str = Field(..., description="Overall system status")
+    version: str = Field(..., description="API version")
+    uptime_seconds: float = Field(..., description="Server uptime in seconds")
+    started_at: str = Field(..., description="Server start time (ISO 8601)")
+    timestamp: str = Field(..., description="Report timestamp (ISO 8601)")
+    services: Dict[str, ServiceCheckResponse] = Field(..., description="Individual service statuses")
+    recent_errors: List[Dict[str, Any]] = Field(..., description="Recent error logs")
 
 
 # === Insight Schemas ===
 
 class InsightResponse(BaseModel):
-    id: int
-    type: str
-    date: str
-    content: str
-    confidence: float
-    created_at: str
+    """AI-generated insight (brief, review, prediction)."""
+    id: int = Field(..., description="Unique insight ID")
+    type: str = Field(..., description="Insight type: daily_brief, weekly_review, energy_prediction, pattern")
+    date: str = Field(..., description="Date for this insight (YYYY-MM-DD)")
+    content: str = Field(..., description="The insight text content")
+    confidence: float = Field(..., ge=0, le=1, description="AI confidence score (0-1)")
+    created_at: str = Field(..., description="Creation timestamp (ISO 8601)")
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 42,
+                "type": "daily_brief",
+                "date": "2026-02-03",
+                "content": "Last night you got 7h 12m of sleep with 1h 45m deep sleep...",
+                "confidence": 0.85,
+                "created_at": "2026-02-03T07:00:00Z"
+            }
+        }
 
 
 class PatternResponse(BaseModel):
-    id: int
-    name: str
-    description: str
-    pattern_type: str
-    variables: List[str]
-    strength: float
-    confidence: float
-    sample_size: int
-    actionable: bool
+    """Detected pattern from historical data analysis."""
+    id: int = Field(..., description="Unique pattern ID")
+    name: str = Field(..., description="Pattern name/title")
+    description: str = Field(..., description="Detailed pattern description with evidence")
+    pattern_type: str = Field(..., description="Type: correlation, trend, day_of_week, window_change")
+    variables: List[str] = Field(..., description="Variables involved in the pattern")
+    strength: float = Field(..., ge=-1, le=1, description="Pattern strength (-1 to 1)")
+    confidence: float = Field(..., ge=0, le=1, description="Statistical confidence (0-1)")
+    sample_size: int = Field(..., ge=0, description="Number of data points used")
+    actionable: bool = Field(..., description="Whether this pattern is actionable")
 
     class Config:
         from_attributes = True
 
 
 class EnergyPrediction(BaseModel):
-    overall: int
-    peak_hours: List[str]
-    low_hours: List[str]
-    suggestion: str
+    """Energy level prediction for a day."""
+    overall: int = Field(..., ge=1, le=10, description="Predicted overall energy (1-10)")
+    peak_hours: List[str] = Field(..., description="Expected high-energy time ranges")
+    low_hours: List[str] = Field(..., description="Expected low-energy time ranges")
+    suggestion: str = Field(..., description="Actionable suggestion for the day")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "overall": 7,
+                "peak_hours": ["9:00-11:00", "15:00-16:00"],
+                "low_hours": ["14:00-15:00"],
+                "suggestion": "Your deep sleep was above average—capitalize on morning focus."
+            }
+        }
 
 
 class GenerateRequest(BaseModel):
-    insight_type: str
-    date: Optional[str] = None
+    """Request to generate an insight."""
+    insight_type: str = Field(..., description="Type: daily_brief, weekly_review, energy_prediction")
+    date: Optional[str] = Field(None, description="Date (YYYY-MM-DD), defaults to today")
 
 
 # === Data Schemas ===
 
 class DataPointResponse(BaseModel):
-    id: int
-    source: str
-    type: str
-    date: str
-    value: Optional[float]
-    metadata: dict
+    """A single data point from any source."""
+    id: int = Field(..., description="Unique data point ID")
+    source: str = Field(..., description="Data source: oura, manual, calendar")
+    type: str = Field(..., description="Data type: sleep, activity, readiness, energy, mood")
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    value: Optional[float] = Field(None, description="Primary numeric value")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional data fields")
 
     class Config:
         from_attributes = True
@@ -91,9 +120,10 @@ class DataPointResponse(BaseModel):
 # === Log/Capture Schemas ===
 
 class LogEnergyRequest(BaseModel):
-    energy: int  # 1-5
-    mood: Optional[int] = None  # 1-5
-    notes: Optional[str] = None
+    """Request to log energy and mood levels."""
+    energy: int = Field(..., ge=1, le=5, description="Energy level (1=Very Low, 5=Excellent)")
+    mood: Optional[int] = Field(None, ge=1, le=5, description="Mood level (1-5)")
+    notes: Optional[str] = Field(None, description="Optional notes about how you feel")
 
 
 class CaptureRequest(BaseModel):

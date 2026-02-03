@@ -22,7 +22,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-00a393.svg)](https://fastapi.tiangolo.com)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Demo](#-demo) • [Architecture](#-architecture) • [API](#-api-overview) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Demo](#-demo) • [Architecture](#-architecture) • [API](#-api-overview) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
 </div>
 
@@ -229,7 +229,9 @@ LifeOS exposes a comprehensive REST API:
 
 ### Full API Documentation
 
-Once running, visit **http://localhost:8080/docs** for interactive Swagger documentation.
+- **Interactive Swagger UI**: [http://localhost:8080/docs](http://localhost:8080/docs)
+- **ReDoc**: [http://localhost:8080/redoc](http://localhost:8080/redoc)
+- **API Reference**: [docs/API.md](docs/API.md) - Complete endpoint documentation
 
 <details>
 <summary>📋 Example: Get Morning Brief</summary>
@@ -306,6 +308,29 @@ GOOGLE_CLIENT_SECRET=xxx
 | **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | **Telegram** | Message [@BotFather](https://t.me/BotFather) on Telegram |
 | **Google Calendar** | [console.cloud.google.com](https://console.cloud.google.com/apis/credentials) |
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/API.md](docs/API.md) | Complete REST API reference with examples |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flow, and extension guide |
+| [docs/PRD.md](docs/PRD.md) | Product requirements and AI philosophy |
+| [QUICKSTART.md](QUICKSTART.md) | 3-step setup guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development guidelines |
+| [ROADMAP.md](ROADMAP.md) | Feature roadmap |
+
+### Type Safety
+
+The codebase is fully typed with MyPy-compliant annotations:
+
+```bash
+# Run type checking
+pip install mypy
+mypy src/
+```
 
 ---
 
