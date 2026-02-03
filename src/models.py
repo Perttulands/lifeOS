@@ -176,3 +176,107 @@ class Note(Base):
     __table_args__ = (
         Index('idx_note_created', 'created_at'),
     )
+
+
+class OAuthToken(Base):
+    """OAuth tokens for external integrations."""
+    __tablename__ = "oauth_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    provider = Column(String(50), nullable=False)  # google, etc.
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text)
+    token_type = Column(String(50), default="Bearer")
+    expires_at = Column(DateTime)
+    scope = Column(Text)  # Comma-separated scopes
+    extra_data = Column("metadata", JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_oauth_provider_user', 'provider', 'user_id'),
+    )
+
+
+class CalendarEvent(Base):
+    """Calendar events from Google Calendar."""
+    __tablename__ = "calendar_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    event_id = Column(String(200), nullable=False)  # Google event ID
+    calendar_id = Column(String(200), nullable=False)  # Google calendar ID
+    summary = Column(String(500))  # Event title
+    description = Column(Text)
+    location = Column(String(500))
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    all_day = Column(Boolean, default=False)
+    status = Column(String(50), default="confirmed")  # confirmed, tentative, cancelled
+    organizer = Column(String(200))  # Organizer email
+    attendees_count = Column(Integer, default=0)
+    is_recurring = Column(Boolean, default=False)
+    recurring_event_id = Column(String(200))  # Parent recurring event ID
+    extra_data = Column("metadata", JSON, default=dict)
+    synced_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_calendar_event_id', 'event_id'),
+        Index('idx_calendar_start_time', 'start_time'),
+        Index('idx_calendar_date', 'start_time', 'end_time'),
+    )
+
+
+class UserPreference(Base):
+    """
+    Learned user preferences for personalization.
+
+    Stores both explicit preferences (user-set) and inferred
+    preferences (learned from behavior patterns).
+
+    Categories:
+    - tone: preferred communication style (casual, professional, concise, detailed)
+    - focus: areas user cares about (sleep_quality, energy, productivity, recovery)
+    - schedule: timing preferences (morning_person, night_owl, peak_hours)
+    - content: what to include/exclude in briefs
+    """
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    category = Column(String(50), nullable=False)  # tone, focus, schedule, content
+    key = Column(String(100), nullable=False)      # preference key within category
+    value = Column(JSON, nullable=False)           # preference value (flexible)
+    weight = Column(Float, default=0.5)            # confidence 0-1 (higher = more certain)
+    source = Column(String(20), default="inferred")  # explicit, inferred, feedback
+    evidence_count = Column(Integer, default=1)    # number of supporting observations
+    last_reinforced = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_preference_user_category', 'user_id', 'category'),
+        Index('idx_preference_key', 'key'),
+    )
+
+
+class InsightFeedback(Base):
+    """
+    Tracks user feedback on generated insights.
+
+    Used to learn preferences and improve future insights.
+    """
+    __tablename__ = "insight_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    insight_id = Column(Integer, nullable=False)   # Reference to insights table
+    feedback_type = Column(String(20), nullable=False)  # helpful, not_helpful, acted_on, dismissed
+    context = Column(JSON, default=dict)           # Additional context (time to read, etc.)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_feedback_insight', 'insight_id'),
+        Index('idx_feedback_type', 'feedback_type'),
+    )
