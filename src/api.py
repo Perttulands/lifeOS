@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import get_db, init_db
-from .models import DataPoint, Insight, Pattern, JournalEntry, Task, Note
+from .models import DataPoint, Insight, Pattern, JournalEntry, Task, Note, User
 from .insights_service import InsightsService
 from .integrations.capture import CaptureService, process_webhook, CaptureType
 from .integrations.oura import OuraSyncService, sync_oura_data
@@ -198,6 +198,37 @@ class WeeklyReviewDeliveryResponse(BaseModel):
     avg_readiness: Optional[int] = None
     notifications: List[NotifyResultResponse]
     all_successful: bool
+
+
+class NotificationSettings(BaseModel):
+    telegram_enabled: bool = False
+    discord_enabled: bool = False
+    quiet_hours_enabled: bool = True
+    quiet_hours_start: str = "23:00"
+    quiet_hours_end: str = "08:00"
+
+
+class IntegrationStatus(BaseModel):
+    oura_configured: bool = False
+    ai_configured: bool = False
+    telegram_configured: bool = False
+    discord_configured: bool = False
+
+
+class SettingsResponse(BaseModel):
+    user_name: str
+    timezone: str
+    notifications: NotificationSettings
+    integrations: IntegrationStatus
+    ai_model: str
+
+
+class SettingsUpdateRequest(BaseModel):
+    user_name: Optional[str] = None
+    timezone: Optional[str] = None
+    quiet_hours_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
 
 
 # === FastAPI App ===
@@ -1074,6 +1105,127 @@ async def get_today_summary(
             "generated_at": brief.created_at.isoformat() if brief else None
         } if brief else None
     }
+
+
+# === Settings Endpoints ===
+
+@app.get("/api/settings", response_model=SettingsResponse)
+async def get_settings(db: Session = Depends(get_db)):
+    """
+    Get current user settings.
+
+    Returns user preferences, notification settings, and integration status.
+    """
+    # Get or create user
+    user = db.query(User).filter(User.id == 1).first()
+    if not user:
+        user = User(id=1, name="User", timezone="UTC", preferences={})
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    prefs = user.preferences or {}
+
+    # Check integration status
+    integrations = IntegrationStatus(
+        oura_configured=bool(settings.oura_token),
+        ai_configured=bool(settings.get_ai_api_key()),
+        telegram_configured=bool(settings.telegram_bot_token and settings.telegram_chat_id),
+        discord_configured=bool(settings.discord_webhook_url)
+    )
+
+    # Build notification settings
+    notifications = NotificationSettings(
+        telegram_enabled=integrations.telegram_configured and prefs.get('telegram_enabled', True),
+        discord_enabled=integrations.discord_configured and prefs.get('discord_enabled', True),
+        quiet_hours_enabled=prefs.get('quiet_hours_enabled', settings.quiet_hours_enabled),
+        quiet_hours_start=prefs.get('quiet_hours_start', settings.quiet_hours_start),
+        quiet_hours_end=prefs.get('quiet_hours_end', settings.quiet_hours_end)
+    )
+
+    return SettingsResponse(
+        user_name=user.name,
+        timezone=user.timezone or settings.user_timezone,
+        notifications=notifications,
+        integrations=integrations,
+        ai_model=settings.litellm_model
+    )
+
+
+@app.put("/api/settings", response_model=SettingsResponse)
+async def update_settings(
+    request: SettingsUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Update user settings.
+
+    Updates user preferences stored in the database.
+    Note: API keys must be configured via .env file for security.
+    """
+    # Get or create user
+    user = db.query(User).filter(User.id == 1).first()
+    if not user:
+        user = User(id=1, name="User", timezone="UTC", preferences={})
+        db.add(user)
+
+    # Update user fields
+    if request.user_name is not None:
+        user.name = request.user_name
+
+    if request.timezone is not None:
+        user.timezone = request.timezone
+
+    # Update preferences JSON
+    prefs = user.preferences or {}
+
+    if request.quiet_hours_enabled is not None:
+        prefs['quiet_hours_enabled'] = request.quiet_hours_enabled
+
+    if request.quiet_hours_start is not None:
+        prefs['quiet_hours_start'] = request.quiet_hours_start
+
+    if request.quiet_hours_end is not None:
+        prefs['quiet_hours_end'] = request.quiet_hours_end
+
+    user.preferences = prefs
+    user.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(user)
+
+    # Return updated settings
+    return await get_settings(db)
+
+
+@app.get("/api/settings/timezones")
+async def get_timezones():
+    """
+    Get list of common timezones for the settings UI.
+    """
+    timezones = [
+        "UTC",
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Los_Angeles",
+        "America/Toronto",
+        "America/Vancouver",
+        "Europe/London",
+        "Europe/Paris",
+        "Europe/Berlin",
+        "Europe/Helsinki",
+        "Europe/Moscow",
+        "Asia/Tokyo",
+        "Asia/Shanghai",
+        "Asia/Singapore",
+        "Asia/Dubai",
+        "Asia/Kolkata",
+        "Australia/Sydney",
+        "Australia/Melbourne",
+        "Pacific/Auckland",
+    ]
+    return {"timezones": timezones}
 
 
 # === Static Files & Frontend ===
