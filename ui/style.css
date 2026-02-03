@@ -94,7 +94,11 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
     overflow-x: hidden;
+    /* Safe area insets for notched phones */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
 }
 
 /* === App Container === */
@@ -854,7 +858,9 @@ body {
 .toast-container {
     position: fixed;
     bottom: var(--space-xl);
+    bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
     right: var(--space-xl);
+    right: calc(var(--space-xl) + env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
@@ -988,6 +994,29 @@ body {
         align-items: flex-start;
     }
 
+    /* Make trend tabs scrollable on mobile */
+    .trend-tabs {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .trend-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .trend-tab {
+        flex-shrink: 0;
+        min-height: 44px;
+        padding: 10px 16px;
+    }
+
+    .trend-chart {
+        height: 160px;
+    }
+
     .brief-card,
     .trend-card,
     .quicklog-card {
@@ -998,6 +1027,25 @@ body {
         font-size: 2rem;
     }
 
+    /* Ensure touch targets are at least 44px */
+    .refresh-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .energy-btn {
+        min-height: 72px;
+        padding: var(--space-sm);
+    }
+
+    .energy-emoji {
+        font-size: 1.25rem;
+    }
+
+    .log-submit {
+        min-height: 48px;
+    }
+
     .toast-container {
         left: var(--space-md);
         right: var(--space-md);
@@ -1006,6 +1054,84 @@ body {
 
     .toast {
         width: 100%;
+    }
+}
+
+/* Very small screens (small phones) */
+@media (max-width: 400px) {
+    .app {
+        padding: var(--space-sm);
+    }
+
+    .brief-card,
+    .trend-card,
+    .quicklog-card,
+    .score-card {
+        padding: var(--space-md);
+    }
+
+    .value-main {
+        font-size: 1.75rem;
+    }
+
+    .brief-text {
+        font-size: 1rem;
+    }
+
+    .logo-text {
+        font-size: 1.25rem;
+    }
+
+    .greeting {
+        font-size: 1rem;
+    }
+
+    /* Stack energy buttons in 2 rows on very small screens */
+    .energy-selector {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .energy-btn {
+        flex: 0 0 calc(33.333% - var(--space-sm));
+        min-width: 60px;
+    }
+
+    /* Smaller trend tabs */
+    .trend-tab {
+        padding: 8px 12px;
+        font-size: 0.7rem;
+    }
+
+    .trend-title {
+        font-size: 0.875rem;
+    }
+
+    .section-title {
+        font-size: 0.875rem;
+    }
+
+    .quicklog-title {
+        font-size: 0.875rem;
+    }
+
+    .quicklog-hint {
+        font-size: 0.75rem;
+    }
+
+    /* Smaller insight cards */
+    .insight-card {
+        padding: var(--space-md);
+    }
+
+    .insight-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+
+    .insight-text {
+        font-size: 0.875rem;
     }
 }
 
@@ -1042,6 +1168,11 @@ body {
 
 button:focus:not(:focus-visible) {
     outline: none;
+}
+
+/* Prevent double-tap zoom delay on buttons */
+button, .energy-btn, .trend-tab, .log-submit, .refresh-btn {
+    touch-action: manipulation;
 }
 
 /* === Loading States === */
@@ -1503,6 +1634,7 @@ button:focus:not(:focus-visible) {
     .modal {
         margin: var(--space-md);
         max-height: calc(100vh - var(--space-xl));
+        max-height: calc(100dvh - var(--space-xl));
     }
 
     .modal-header,
@@ -1519,5 +1651,55 @@ button:focus:not(:focus-visible) {
     .time-separator {
         text-align: center;
         padding: var(--space-xs) 0;
+    }
+}
+
+/* === Landscape orientation on mobile === */
+@media (max-height: 500px) and (orientation: landscape) {
+    .app {
+        padding: var(--space-sm) var(--space-lg);
+    }
+
+    .header {
+        margin-bottom: var(--space-md);
+    }
+
+    .main {
+        gap: var(--space-md);
+    }
+
+    .brief-card,
+    .trend-card,
+    .quicklog-card,
+    .score-card {
+        padding: var(--space-md);
+    }
+
+    .brief-icon-wrapper {
+        width: 36px;
+        height: 36px;
+        font-size: 1.25rem;
+    }
+
+    .scores-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-md);
+    }
+
+    .score-card:last-child {
+        grid-column: auto;
+    }
+
+    .trend-chart {
+        height: 120px;
+    }
+
+    .value-main {
+        font-size: 1.75rem;
+    }
+
+    /* Hide non-essential elements in landscape */
+    .ambient-glow {
+        display: none;
     }
 }
