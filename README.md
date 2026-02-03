@@ -198,6 +198,73 @@ Or via API:
 curl -X POST http://localhost:8080/api/weekly-review/deliver
 ```
 
+## Google Calendar Integration
+
+Connect your Google Calendar to detect meeting patterns and their effect on your energy.
+
+### Setup
+
+1. **Create OAuth2 credentials** at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - Create a new OAuth 2.0 Client ID (Web application)
+   - Add `http://localhost:8080/api/calendar/callback` to authorized redirect URIs
+   - Download the credentials
+
+2. **Add to your `.env`:**
+```bash
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_client_secret
+```
+
+3. **Connect your calendar:**
+   - Visit `http://localhost:8080/api/calendar/auth` to get the authorization URL
+   - Complete the Google OAuth flow
+   - You'll be redirected back after authorization
+
+### Cron Job
+
+```bash
+# Sync calendar every 2 hours
+0 */2 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.calendar_sync
+```
+
+### Manual Sync
+
+```bash
+# Sync recent events (7 days back, 14 days forward)
+python -m src.jobs.calendar_sync
+
+# Sync more history
+python -m src.jobs.calendar_sync --days-back 30 --days-forward 30
+```
+
+### API Endpoints
+
+```bash
+# Check connection status
+curl http://localhost:8080/api/calendar/status
+
+# Get authorization URL
+curl http://localhost:8080/api/calendar/auth
+
+# Trigger manual sync
+curl -X POST http://localhost:8080/api/calendar/sync \
+  -H "Content-Type: application/json" \
+  -d '{"days_back": 7, "days_forward": 14}'
+
+# Get meeting stats for a date
+curl http://localhost:8080/api/calendar/stats/2026-02-03
+
+# Get today's calendar overview
+curl http://localhost:8080/api/calendar/today
+```
+
+### Meeting Pattern Detection
+
+The calendar integration creates "meeting density" data points that the AI uses to detect patterns like:
+- High meeting days correlating with lower energy
+- Back-to-back meetings affecting afternoon focus
+- Early/late meetings impacting sleep quality
+
 ## Database Backup & Restore
 
 LifeOS includes automated backup/restore functionality for your SQLite database.
