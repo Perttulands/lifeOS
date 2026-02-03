@@ -268,3 +268,96 @@ class BackupResponse(BaseModel):
 
 class RestoreRequest(BaseModel):
     backup_id: str
+
+
+# === Calendar Schemas ===
+
+class CalendarAuthUrlResponse(BaseModel):
+    auth_url: str
+    configured: bool
+
+
+class CalendarEventResponse(BaseModel):
+    id: int
+    event_id: str
+    summary: Optional[str]
+    description: Optional[str]
+    location: Optional[str]
+    start_time: str
+    end_time: str
+    all_day: bool
+    status: str
+    organizer: Optional[str]
+    attendees_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class CalendarSyncRequest(BaseModel):
+    days_back: int = 7
+    days_forward: int = 14
+    calendar_id: str = "primary"
+
+
+class CalendarSyncResultResponse(BaseModel):
+    status: str
+    events_synced: int
+    events_updated: int
+    events_deleted: int
+    date_range: List[str]
+    errors: List[str]
+
+
+class CalendarStatusResponse(BaseModel):
+    configured: bool
+    connected: bool
+    last_sync: Optional[str] = None
+    calendars: List[Dict] = []
+
+
+class MeetingStatsResponse(BaseModel):
+    date: str
+    meeting_count: int
+    total_hours: float
+    back_to_back_count: int
+    early_meetings: int
+    late_meetings: int
+    events: List[Dict]
+
+
+# === Token Cost/Stats Schemas ===
+
+class FeatureCostSummary(BaseModel):
+    feature: str
+    total_calls: int
+    total_tokens: int
+    total_cost_usd: float
+    avg_tokens_per_call: float
+    avg_cost_per_call: float
+
+
+class CostReportResponse(BaseModel):
+    period_start: str
+    period_end: str
+    total_calls: int
+    total_tokens: int
+    total_cost_usd: float
+    by_feature: List[FeatureCostSummary]
+    by_day: Dict[str, float]
+    model_used: str
+
+
+class TokenUsageResponse(BaseModel):
+    feature: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cost_usd: float
+    timestamp: str
+
+
+class StatsResponse(BaseModel):
+    cost_report: CostReportResponse
+    recent_usage: List[TokenUsageResponse]

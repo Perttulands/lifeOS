@@ -12,6 +12,8 @@ from .notify import router as notify_router
 from .capture import router as capture_router
 from .settings import router as settings_router
 from .backup import router as backup_router
+from .calendar import router as calendar_router
+from .stats import router as stats_router
 
 __all__ = [
     "health_router",
@@ -22,4 +24,6 @@ __all__ = [
     "capture_router",
     "settings_router",
     "backup_router",
+    "calendar_router",
+    "stats_router",
 ]
