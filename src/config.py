@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     # Oura API
     oura_token: str = Field(default="", alias="OURA_TOKEN")
+    oura_client_id: str = Field(default="", alias="OURA_CLIENT_ID")
+    oura_client_secret: str = Field(default="", alias="OURA_CLIENT_SECRET")
     oura_base_url: str = "https://api.ouraring.com/v2"
 
     # LiteLLM / AI
@@ -24,6 +26,13 @@ class Settings(BaseSettings):
     # Direct API keys (optional, LiteLLM can use these)
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+
+    # Notifications - Telegram
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
+
+    # Notifications - Discord
+    discord_webhook_url: str = Field(default="", alias="DISCORD_WEBHOOK_URL")
 
     # Database
     database_url: str = Field(

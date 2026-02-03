@@ -153,6 +153,32 @@ class OuraSyncResponse(BaseModel):
     total_synced: int
 
 
+class BriefDeliveryRequest(BaseModel):
+    date: Optional[str] = None
+    channels: Optional[List[str]] = None  # ["telegram", "discord"]
+    regenerate: bool = False
+
+
+class NotifyResultResponse(BaseModel):
+    success: bool
+    channel: str
+    message_id: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BriefDeliveryResponse(BaseModel):
+    brief_date: str
+    brief_content: str
+    notifications: List[NotifyResultResponse]
+    all_successful: bool
+
+
+class NotifyStatusResponse(BaseModel):
+    telegram_enabled: bool
+    discord_enabled: bool
+    enabled_channels: List[str]
+
+
 # === FastAPI App ===
 
 app = FastAPI(
@@ -423,7 +449,7 @@ async def get_sleep_data(
             type=d.type,
             date=d.date,
             value=d.value,
-            metadata=d.metadata or {}
+            metadata=d.extra_data or {}
         )
         for d in data
     ]
@@ -453,7 +479,7 @@ async def get_readiness_data(
             type=d.type,
             date=d.date,
             value=d.value,
-            metadata=d.metadata or {}
+            metadata=d.extra_data or {}
         )
         for d in data
     ]
@@ -483,7 +509,7 @@ async def get_activity_data(
             type=d.type,
             date=d.date,
             value=d.value,
-            metadata=d.metadata or {}
+            metadata=d.extra_data or {}
         )
         for d in data
     ]
@@ -573,6 +599,123 @@ async def oura_status():
     }
 
 
+# === Notifications ===
+
+@app.get("/api/notify/status", response_model=NotifyStatusResponse)
+async def notify_status():
+    """
+    Check notification configuration status.
+
+    Returns which channels (Telegram, Discord) are configured.
+    """
+    from .integrations.notify import get_notification_service
+
+    notifier = get_notification_service()
+
+    return NotifyStatusResponse(
+        telegram_enabled=notifier.telegram_enabled,
+        discord_enabled=notifier.discord_enabled,
+        enabled_channels=[c.value for c in notifier.enabled_channels]
+    )
+
+
+@app.post("/api/brief/deliver", response_model=BriefDeliveryResponse)
+async def deliver_brief(
+    request: BriefDeliveryRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate and deliver today's brief via Telegram/Discord.
+
+    This is the main endpoint for morning brief delivery.
+    Can be called by cron or manually triggered.
+
+    Args:
+        date: Date for brief (defaults to today)
+        channels: Specific channels to use (defaults to all enabled)
+        regenerate: Force regenerate even if brief exists
+    """
+    from .integrations.notify import get_notification_service, NotifyChannel
+
+    # Get or generate brief
+    date = request.date or datetime.now().strftime("%Y-%m-%d")
+    service = InsightsService(db)
+
+    if request.regenerate:
+        insight = service.force_regenerate("daily_brief", date)
+    else:
+        insight = service.generate_daily_brief(date)
+
+    if not insight:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate brief - insufficient data"
+        )
+
+    # Get sleep and readiness for display
+    sleep_dp = db.query(DataPoint).filter(
+        DataPoint.date == date,
+        DataPoint.type == "sleep"
+    ).first()
+    readiness_dp = db.query(DataPoint).filter(
+        DataPoint.date == date,
+        DataPoint.type == "readiness"
+    ).first()
+
+    sleep_hours = sleep_dp.value if sleep_dp else None
+    readiness_score = int(readiness_dp.value) if readiness_dp else None
+
+    # Get notification service
+    notifier = get_notification_service()
+
+    if not notifier.enabled_channels:
+        raise HTTPException(
+            status_code=400,
+            detail="No notification channels configured. Set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL"
+        )
+
+    # Parse requested channels
+    channels = None
+    if request.channels:
+        channels = []
+        for ch in request.channels:
+            try:
+                channels.append(NotifyChannel(ch.lower()))
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid channel: {ch}. Valid: telegram, discord"
+                )
+
+    # Send notifications
+    results = notifier.send_brief_sync(
+        content=insight.content,
+        date=insight.date,
+        sleep_hours=sleep_hours,
+        readiness_score=readiness_score,
+        confidence=insight.confidence,
+        channels=channels
+    )
+
+    # Build response
+    notify_responses = [
+        NotifyResultResponse(
+            success=r.success,
+            channel=r.channel.value,
+            message_id=r.message_id,
+            error=r.error
+        )
+        for r in results
+    ]
+
+    return BriefDeliveryResponse(
+        brief_date=insight.date,
+        brief_content=insight.content,
+        notifications=notify_responses,
+        all_successful=all(r.success for r in results)
+    )
+
+
 # === Quick Capture ===
 
 @app.post("/api/log")
@@ -604,7 +747,7 @@ async def log_energy(
         type="energy",
         date=date,
         value=request.energy,
-        metadata={
+        extra_data={
             "time": time,
             "mood": request.mood,
             "notes": request.notes
@@ -760,8 +903,8 @@ async def get_today_summary(
         "date": today,
         "sleep": {
             "duration_hours": sleep.value if sleep else None,
-            "score": sleep.metadata.get('score') if sleep and sleep.metadata else None,
-            "deep_sleep_hours": sleep.metadata.get('deep_sleep_hours') if sleep and sleep.metadata else None
+            "score": sleep.extra_data.get('score') if sleep and sleep.extra_data else None,
+            "deep_sleep_hours": sleep.extra_data.get('deep_sleep_hours') if sleep and sleep.extra_data else None
         } if sleep else None,
         "readiness": {
             "score": readiness.value if readiness else None

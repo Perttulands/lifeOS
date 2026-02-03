@@ -41,7 +41,7 @@ class DataPoint(Base):
     type = Column(String(50), nullable=False)    # sleep, activity, readiness, energy, mood
     date = Column(String(10), nullable=False)    # YYYY-MM-DD
     value = Column(Float)                        # Primary numeric value
-    metadata = Column(JSON, default=dict)        # Additional data
+    extra_data = Column("metadata", JSON, default=dict)  # Additional data (column name 'metadata' in DB)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -130,7 +130,7 @@ class Goal(Base):
     target_date = Column(String(10))
     status = Column(String(20), default="active")  # active, completed, paused, abandoned
     progress = Column(Float, default=0.0)          # 0-100
-    metadata = Column(JSON, default=dict)
+    extra_data = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -149,7 +149,7 @@ class Task(Base):
     tags = Column(JSON, default=list)
     source = Column(String(50), default="manual")  # manual, telegram, discord, voice
     raw_input = Column(Text)  # Original captured text
-    metadata = Column(JSON, default=dict)
+    extra_data = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -170,7 +170,7 @@ class Note(Base):
     tags = Column(JSON, default=list)
     source = Column(String(50), default="manual")  # manual, telegram, discord, voice
     raw_input = Column(Text)  # Original captured text
-    metadata = Column(JSON, default=dict)
+    extra_data = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (

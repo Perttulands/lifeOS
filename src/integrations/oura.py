@@ -87,8 +87,8 @@ class OuraClient:
             access_token=access_token or settings.oura_token,
             refresh_token=refresh_token
         )
-        self.client_id = client_id
-        self.client_secret = client_secret
+        self.client_id = client_id or settings.oura_client_id
+        self.client_secret = client_secret or settings.oura_client_secret
         self._http_client: Optional[httpx.Client] = None
 
     @property
@@ -295,7 +295,7 @@ class OuraSyncService:
             type="sleep",
             date=data.get("day", ""),
             value=data.get("score"),  # Overall sleep score
-            metadata={
+            extra_data={
                 "total_sleep_duration": data.get("total_sleep_duration"),  # seconds
                 "deep_sleep_duration": contributors.get("deep_sleep"),
                 "rem_sleep_duration": contributors.get("rem_sleep"),
@@ -317,7 +317,7 @@ class OuraSyncService:
             type="activity",
             date=data.get("day", ""),
             value=data.get("score"),  # Overall activity score
-            metadata={
+            extra_data={
                 "active_calories": data.get("active_calories"),
                 "total_calories": data.get("total_calories"),
                 "steps": data.get("steps"),
@@ -346,7 +346,7 @@ class OuraSyncService:
             type="readiness",
             date=data.get("day", ""),
             value=data.get("score"),  # Overall readiness score
-            metadata={
+            extra_data={
                 "temperature_deviation": data.get("temperature_deviation"),
                 "temperature_trend_deviation": data.get("temperature_trend_deviation"),
                 "activity_balance": contributors.get("activity_balance"),
@@ -379,7 +379,7 @@ class OuraSyncService:
 
             if existing:
                 existing.value = dp.value
-                existing.metadata = dp.metadata
+                existing.extra_data = dp.extra_data
                 existing.timestamp = datetime.utcnow()
             else:
                 self.db.add(dp)
