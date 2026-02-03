@@ -1,0 +1,61 @@
+# Git
+.git
+.gitattributes
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation (not needed in container)
+docs/
+missions/
+*.md
+!requirements.txt
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+lifeos.db
+
+# Environment files (loaded separately)
+.env
+.env.*
+!.env.example
+
+# Beads tooling
+.beads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

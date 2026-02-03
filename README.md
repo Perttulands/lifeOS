@@ -39,6 +39,72 @@ python -m uvicorn src.api:app --reload --port 8080
 
 Open http://localhost:8080
 
+## Docker Deployment
+
+The recommended way to run LifeOS in production.
+
+### Quick Start with Docker Compose
+
+```bash
+# Clone and setup
+git clone https://github.com/Perttulands/lifeOS.git
+cd lifeOS
+
+# Create your environment file
+cp .env.example .env
+# Edit .env and add your OURA_TOKEN, LITELLM_API_KEY
+
+# Build and run
+docker compose up -d
+
+# View logs
+docker compose logs -f
+```
+
+Open http://localhost:8080
+
+### Docker Commands
+
+```bash
+# Build the image
+docker compose build
+
+# Start in background
+docker compose up -d
+
+# Stop
+docker compose down
+
+# Stop and remove data volume
+docker compose down -v
+
+# View logs
+docker compose logs -f lifeos
+
+# Restart
+docker compose restart
+```
+
+### Data Persistence
+
+SQLite database is stored in a Docker volume (`lifeos-data`). Your data persists across container restarts.
+
+To backup:
+```bash
+docker compose exec lifeos cp /data/lifeos.db /data/backup.db
+docker cp lifeos:/data/backup.db ./backup.db
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OURA_TOKEN` | Yes | - | Oura Personal Access Token |
+| `LITELLM_API_KEY` | Yes | - | LiteLLM/OpenAI API key |
+| `LITELLM_MODEL` | No | `gpt-4o-mini` | AI model to use |
+| `DATABASE_URL` | No | `sqlite:////data/lifeos.db` | Database connection |
+| `PORT` | No | `8080` | Server port |
+
 ## Stack
 
 - **Backend:** Python + FastAPI

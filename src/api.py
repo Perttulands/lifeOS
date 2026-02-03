@@ -16,8 +16,9 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import get_db, init_db
-from .models import DataPoint, Insight, Pattern, JournalEntry
+from .models import DataPoint, Insight, Pattern, JournalEntry, Task, Note
 from .insights_service import InsightsService
+from .integrations.capture import CaptureService, process_webhook, CaptureType
 
 
 # === Pydantic Models ===
@@ -80,6 +81,54 @@ class DataPointResponse(BaseModel):
     date: str
     value: Optional[float]
     metadata: dict
+
+    class Config:
+        from_attributes = True
+
+
+class CaptureRequest(BaseModel):
+    text: str
+    source: Optional[str] = "manual"
+
+
+class WebhookPayload(BaseModel):
+    text: str
+    source: Optional[str] = "webhook"
+    user_id: Optional[str] = None
+    timestamp: Optional[str] = None
+    chat_id: Optional[str] = None
+    message_id: Optional[str] = None
+
+
+class CaptureResponse(BaseModel):
+    type: str
+    success: bool
+    message: str
+    data: dict
+
+
+class TaskResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    status: str
+    priority: str
+    due_date: Optional[str]
+    tags: List[str]
+    source: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class NoteResponse(BaseModel):
+    id: int
+    title: Optional[str]
+    content: str
+    tags: List[str]
+    source: str
+    created_at: str
 
     class Config:
         from_attributes = True
@@ -470,6 +519,102 @@ async def log_energy(
     }
 
 
+@app.post("/api/capture", response_model=CaptureResponse)
+async def capture_message(
+    request: CaptureRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Quick capture with AI categorization.
+
+    Accepts free-form text, uses AI to categorize as note/task/energy,
+    and stores appropriately.
+    """
+    service = CaptureService(db)
+    result = service.process(
+        text=request.text,
+        source=request.source or "manual"
+    )
+
+    return CaptureResponse(
+        type=result.type.value,
+        success=result.success,
+        message=result.message,
+        data=result.data
+    )
+
+
+@app.post("/api/webhook/clawdbot", response_model=CaptureResponse)
+async def clawdbot_webhook(
+    payload: WebhookPayload,
+    db: Session = Depends(get_db)
+):
+    """
+    Webhook endpoint for Clawdbot (Telegram/Discord).
+
+    Receives messages and processes them through the capture system.
+    """
+    result = process_webhook(db, payload.model_dump())
+
+    return CaptureResponse(
+        type=result.type.value,
+        success=result.success,
+        message=result.message,
+        data=result.data
+    )
+
+
+@app.get("/api/tasks", response_model=List[TaskResponse])
+async def get_tasks(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """Get tasks, optionally filtered by status."""
+    query = db.query(Task)
+
+    if status:
+        query = query.filter(Task.status == status)
+
+    tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
+
+    return [
+        TaskResponse(
+            id=t.id,
+            title=t.title,
+            description=t.description,
+            status=t.status,
+            priority=t.priority,
+            due_date=t.due_date,
+            tags=t.tags or [],
+            source=t.source,
+            created_at=t.created_at.isoformat()
+        )
+        for t in tasks
+    ]
+
+
+@app.get("/api/notes", response_model=List[NoteResponse])
+async def get_notes(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """Get recent notes."""
+    notes = db.query(Note).order_by(Note.created_at.desc()).limit(limit).all()
+
+    return [
+        NoteResponse(
+            id=n.id,
+            title=n.title,
+            content=n.content,
+            tags=n.tags or [],
+            source=n.source,
+            created_at=n.created_at.isoformat()
+        )
+        for n in notes
+    ]
+
+
 @app.get("/api/today")
 async def get_today_summary(
     db: Session = Depends(get_db)
@@ -531,6 +676,34 @@ async def get_today_summary(
             "generated_at": brief.created_at.isoformat() if brief else None
         } if brief else None
     }
+
+
+# === Static Files & Frontend ===
+
+import os
+from pathlib import Path
+
+# Determine UI directory (works in both local dev and Docker)
+_ui_dir = Path(__file__).parent.parent / "ui"
+if not _ui_dir.exists():
+    _ui_dir = Path("/app/ui")
+
+if _ui_dir.exists():
+    # Serve static assets (CSS, JS)
+    app.mount("/static", StaticFiles(directory=str(_ui_dir)), name="static")
+
+    @app.get("/")
+    async def serve_index():
+        """Serve the main dashboard."""
+        return FileResponse(str(_ui_dir / "index.html"))
+
+    @app.get("/{path:path}")
+    async def serve_static(path: str):
+        """Serve static files or fallback to index for SPA routing."""
+        file_path = _ui_dir / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_ui_dir / "index.html"))
 
 
 # === Run Server ===
