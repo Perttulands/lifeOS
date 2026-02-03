@@ -16,6 +16,7 @@ from src.integrations.notify import (
     NotifyChannel,
     NotifyResult,
     MobileBriefFormatter,
+    MobileFormatter,
     get_notification_service,
 )
 
@@ -419,3 +420,165 @@ class TestNotifyResult:
         assert result.channel == NotifyChannel.DISCORD
         assert result.message_id is None
         assert result.error == "Webhook not found"
+
+
+# === Weekly Review Formatter Tests ===
+
+class TestWeeklyReviewFormatter:
+    """Tests for weekly review formatting."""
+
+    def test_format_weekly_review_telegram(self):
+        """Test Telegram format for weekly review."""
+        formatter = MobileFormatter()
+
+        result = formatter.format_weekly_review(
+            content="Your week showed steady improvement.",
+            week_ending="2026-02-03",
+            avg_sleep_hours=7.2,
+            avg_readiness=68,
+            patterns=[
+                {"name": "Late nights → tired mornings"},
+                {"name": "Exercise → better sleep"}
+            ],
+            confidence=0.82
+        )
+
+        assert "Weekly Review" in result
+        assert "Jan 28 - Feb 03" in result
+        assert "Avg 7h 12m sleep" in result
+        assert "Avg 68% ready" in result
+        assert "Your week showed steady improvement" in result
+        assert "Patterns Detected" in result
+        assert "Late nights" in result
+        assert "82%" in result
+
+    def test_format_weekly_review_minimal_data(self):
+        """Test weekly review with minimal data."""
+        formatter = MobileFormatter()
+
+        result = formatter.format_weekly_review(
+            content="Weekly summary here",
+            week_ending="2026-02-03"
+        )
+
+        assert "Weekly Review" in result
+        assert "Weekly summary here" in result
+        # No stats when no data
+        assert "Avg" not in result or "sleep" not in result.lower()
+
+    def test_format_weekly_review_discord(self):
+        """Test Discord embed format for weekly review."""
+        formatter = MobileFormatter()
+
+        result = formatter.format_weekly_review_discord(
+            content="Great week overall!",
+            week_ending="2026-02-03",
+            avg_sleep_hours=7.5,
+            avg_readiness=75,
+            patterns=[
+                {"name": "Consistent bedtime wins"}
+            ],
+            confidence=0.85
+        )
+
+        assert "embeds" in result
+        embed = result["embeds"][0]
+
+        assert embed["title"] == "📊 Weekly Review"
+        assert embed["description"] == "Great week overall!"
+        assert len(embed["fields"]) == 3  # sleep, readiness, patterns
+        assert embed["fields"][0]["name"] == "😴 Avg Sleep"
+        assert embed["fields"][1]["name"] == "💪 Avg Readiness"
+        assert embed["fields"][2]["name"] == "🔍 Patterns"
+
+    def test_format_weekly_review_discord_color(self):
+        """Test Discord embed color varies by avg readiness."""
+        formatter = MobileFormatter()
+
+        # High avg readiness = green
+        high = formatter.format_weekly_review_discord(
+            ".", "2026-02-03", avg_readiness=75
+        )
+        assert high["embeds"][0]["color"] == 0x2ECC71
+
+        # Medium avg readiness = yellow
+        med = formatter.format_weekly_review_discord(
+            ".", "2026-02-03", avg_readiness=55
+        )
+        assert med["embeds"][0]["color"] == 0xF1C40F
+
+        # Low avg readiness = red
+        low = formatter.format_weekly_review_discord(
+            ".", "2026-02-03", avg_readiness=40
+        )
+        assert low["embeds"][0]["color"] == 0xE74C3C
+
+
+class TestWeeklyReviewSend:
+    """Tests for sending weekly reviews."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_weekly_review_telegram(self):
+        """Test sending weekly review via Telegram."""
+        respx.post("https://api.telegram.org/bottoken/sendMessage").mock(
+            return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 42}})
+        )
+
+        service = NotificationService(
+            telegram_bot_token="token",
+            telegram_chat_id="123"
+        )
+
+        results = await service.send_weekly_review(
+            content="Weekly summary",
+            week_ending="2026-02-03",
+            avg_sleep_hours=7.0,
+            avg_readiness=70
+        )
+
+        assert len(results) == 1
+        assert results[0].success
+        assert results[0].channel == NotifyChannel.TELEGRAM
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_weekly_review_discord(self):
+        """Test sending weekly review via Discord."""
+        respx.post("https://discord.com/api/webhooks/test").mock(
+            return_value=httpx.Response(204)
+        )
+
+        service = NotificationService(
+            discord_webhook_url="https://discord.com/api/webhooks/test"
+        )
+
+        results = await service.send_weekly_review(
+            content="Weekly summary",
+            week_ending="2026-02-03",
+            patterns=[{"name": "Test pattern"}]
+        )
+
+        assert len(results) == 1
+        assert results[0].success
+        assert results[0].channel == NotifyChannel.DISCORD
+
+    def test_send_weekly_review_sync(self):
+        """Test synchronous weekly review send."""
+        with respx.mock:
+            respx.post("https://api.telegram.org/bottoken/sendMessage").mock(
+                return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+            )
+
+            service = NotificationService(
+                telegram_bot_token="token",
+                telegram_chat_id="123"
+            )
+
+            results = service.send_weekly_review_sync(
+                content="Weekly sync test",
+                week_ending="2026-02-03"
+            )
+
+            assert len(results) == 1
+            assert results[0].success

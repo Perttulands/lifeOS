@@ -175,6 +175,35 @@ Or via API:
 curl -X POST http://localhost:8080/api/brief/deliver
 ```
 
+## Weekly Review Delivery
+
+Get your weekly summary delivered to Telegram or Discord on Sunday evenings.
+
+### Cron Job
+
+```bash
+# Weekly review at 6 PM on Sundays
+0 18 * * 0 cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.weekly_review --notify
+```
+
+### Manual Trigger
+
+```bash
+# Generate and send
+python -m src.jobs.weekly_review --notify
+
+# Re-send existing review
+python -m src.jobs.weekly_review --notify-only
+
+# Force regenerate and send
+python -m src.jobs.weekly_review --force --notify
+```
+
+Or via API:
+```bash
+curl -X POST http://localhost:8080/api/weekly-review/deliver
+```
+
 ## Stack
 
 - **Backend:** Python + FastAPI
