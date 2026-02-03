@@ -1,364 +1,418 @@
-# LifeOS 🌙
+<div align="center">
 
-> Your personal operating system for life.
-
-LifeOS connects your biometric data (Oura), calendar, and daily inputs to surface AI-powered insights that actually help you live better.
-
-## Why?
-
-Most self-management tools demand more than they give. LifeOS inverts this:
-
-- **Passive capture** - Oura syncs automatically, AI does the work
-- **Active insights** - "Your deep sleep drops 40% after late meetings"
-- **Zero friction** - If it takes effort, it better be worth it
-
-## Features
-
-- 🌅 **Daily Brief** - Morning AI summary based on sleep, calendar, energy
-- 📱 **Mobile Delivery** - Get briefs via Telegram/Discord at 7 AM
-- 💤 **Sleep Insights** - Patterns you'd never notice yourself
-- ⚡ **Energy Tracking** - Know when you do your best work
-- 📊 **Beautiful Dashboard** - Glanceable, joyful, useful
-
-## Quick Start
-
-```bash
-# Clone
-git clone https://github.com/Perttulands/lifeOS.git
-cd lifeOS
-
-# Run setup script (creates venv, installs deps, inits db)
-./setup.sh
-
-# Edit .env with your API tokens
-nano .env  # Add OURA_TOKEN and LITELLM_API_KEY
-
-# Activate virtual environment and run
-source .venv/bin/activate
-python -m uvicorn src.api:app --reload --port 8080
+```
+   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   █                                                           █
+   █     ██╗     ██╗███████╗███████╗ ██████╗ ███████╗          █
+   █     ██║     ██║██╔════╝██╔════╝██╔═══██╗██╔════╝          █
+   █     ██║     ██║█████╗  █████╗  ██║   ██║███████╗          █
+   █     ██║     ██║██╔══╝  ██╔══╝  ██║   ██║╚════██║          █
+   █     ███████╗██║██║     ███████╗╚██████╔╝███████║          █
+   █     ╚══════╝╚═╝╚═╝     ╚══════╝ ╚═════╝ ╚══════╝          █
+   █                                                           █
+   █              Your Personal Operating System               █
+   █                                                           █
+   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ```
 
-Open http://localhost:8080
+### *Stop tracking. Start living.*
 
-### Manual Setup
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-00a393.svg)](https://fastapi.tiangolo.com)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-If you prefer manual setup:
+[Features](#-features) • [Quick Start](#-quick-start) • [Demo](#-demo) • [Architecture](#-architecture) • [API](#-api-overview) • [Contributing](#-contributing)
 
-```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup environment
-cp .env.example .env
-# Edit .env and add your tokens
-
-# Initialize database
-python -c "from src.database import init_db; from src.models import *; init_db()"
-
-# Run
-python -m uvicorn src.api:app --reload --port 8080
-```
-
-## Docker Deployment
-
-The recommended way to run LifeOS in production.
-
-### Quick Start with Docker Compose
-
-```bash
-# Clone and setup
-git clone https://github.com/Perttulands/lifeOS.git
-cd lifeOS
-
-# Create your environment file
-cp .env.example .env
-# Edit .env and add your OURA_TOKEN, LITELLM_API_KEY
-
-# Build and run
-docker compose up -d
-
-# View logs
-docker compose logs -f
-```
-
-Open http://localhost:8080
-
-### Docker Commands
-
-```bash
-# Build the image
-docker compose build
-
-# Start in background
-docker compose up -d
-
-# Stop
-docker compose down
-
-# Stop and remove data volume
-docker compose down -v
-
-# View logs
-docker compose logs -f lifeos
-
-# Restart
-docker compose restart
-```
-
-### Data Persistence
-
-SQLite database is stored in a Docker volume (`lifeos-data`). Your data persists across container restarts.
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `OURA_TOKEN` | Yes | - | Oura Personal Access Token |
-| `LITELLM_API_KEY` | Yes | - | LiteLLM/OpenAI API key |
-| `LITELLM_MODEL` | No | `gpt-4o-mini` | AI model to use |
-| `TELEGRAM_BOT_TOKEN` | No | - | Telegram Bot API token (from @BotFather) |
-| `TELEGRAM_CHAT_ID` | No | - | Your Telegram chat ID |
-| `DISCORD_WEBHOOK_URL` | No | - | Discord channel webhook URL |
-| `DATABASE_URL` | No | `sqlite:////data/lifeos.db` | Database connection |
-| `PORT` | No | `8080` | Server port |
-
-## Morning Brief Delivery
-
-Get your daily brief delivered to Telegram or Discord at 7 AM.
-
-### Setup
-
-1. **Telegram**: Create a bot via @BotFather, get the token. Message the bot, then get your chat ID from `https://api.telegram.org/bot<TOKEN>/getUpdates`
-
-2. **Discord**: In your server, go to Channel Settings > Integrations > Webhooks > New Webhook
-
-3. Add to your `.env`:
-```bash
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
-TELEGRAM_CHAT_ID=123456789
-# or
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-```
-
-### Cron Job
-
-```bash
-# Daily brief at 7 AM
-0 7 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.daily_brief --notify
-```
-
-### Manual Trigger
-
-```bash
-# Generate and send
-python -m src.jobs.daily_brief --notify
-
-# Re-send existing brief
-python -m src.jobs.daily_brief --notify-only
-
-# Force regenerate and send
-python -m src.jobs.daily_brief --force --notify
-```
-
-Or via API:
-```bash
-curl -X POST http://localhost:8080/api/brief/deliver
-```
-
-## Weekly Review Delivery
-
-Get your weekly summary delivered to Telegram or Discord on Sunday evenings.
-
-### Cron Job
-
-```bash
-# Weekly review at 6 PM on Sundays
-0 18 * * 0 cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.weekly_review --notify
-```
-
-### Manual Trigger
-
-```bash
-# Generate and send
-python -m src.jobs.weekly_review --notify
-
-# Re-send existing review
-python -m src.jobs.weekly_review --notify-only
-
-# Force regenerate and send
-python -m src.jobs.weekly_review --force --notify
-```
-
-Or via API:
-```bash
-curl -X POST http://localhost:8080/api/weekly-review/deliver
-```
-
-## Google Calendar Integration
-
-Connect your Google Calendar to detect meeting patterns and their effect on your energy.
-
-### Setup
-
-1. **Create OAuth2 credentials** at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Create a new OAuth 2.0 Client ID (Web application)
-   - Add `http://localhost:8080/api/calendar/callback` to authorized redirect URIs
-   - Download the credentials
-
-2. **Add to your `.env`:**
-```bash
-GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_client_secret
-```
-
-3. **Connect your calendar:**
-   - Visit `http://localhost:8080/api/calendar/auth` to get the authorization URL
-   - Complete the Google OAuth flow
-   - You'll be redirected back after authorization
-
-### Cron Job
-
-```bash
-# Sync calendar every 2 hours
-0 */2 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.calendar_sync
-```
-
-### Manual Sync
-
-```bash
-# Sync recent events (7 days back, 14 days forward)
-python -m src.jobs.calendar_sync
-
-# Sync more history
-python -m src.jobs.calendar_sync --days-back 30 --days-forward 30
-```
-
-### API Endpoints
-
-```bash
-# Check connection status
-curl http://localhost:8080/api/calendar/status
-
-# Get authorization URL
-curl http://localhost:8080/api/calendar/auth
-
-# Trigger manual sync
-curl -X POST http://localhost:8080/api/calendar/sync \
-  -H "Content-Type: application/json" \
-  -d '{"days_back": 7, "days_forward": 14}'
-
-# Get meeting stats for a date
-curl http://localhost:8080/api/calendar/stats/2026-02-03
-
-# Get today's calendar overview
-curl http://localhost:8080/api/calendar/today
-```
-
-### Meeting Pattern Detection
-
-The calendar integration creates "meeting density" data points that the AI uses to detect patterns like:
-- High meeting days correlating with lower energy
-- Back-to-back meetings affecting afternoon focus
-- Early/late meetings impacting sleep quality
-
-## Database Backup & Restore
-
-LifeOS includes automated backup/restore functionality for your SQLite database.
-
-### Automated Daily Backup
-
-Set up a cron job for daily backups:
-
-```bash
-# Daily backup at 2 AM
-0 2 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.backup
-```
-
-### Manual Commands
-
-```bash
-# Create a backup
-python -m src.jobs.backup
-
-# List all backups
-python -m src.jobs.backup --list
-
-# Restore the latest backup
-python -m src.jobs.backup --restore latest
-
-# Restore a specific backup
-python -m src.jobs.backup --restore 2026-02-03_020000
-
-# Verify a backup
-python -m src.jobs.backup --verify 2026-02-03_020000
-
-# Remove backups older than 7 days (keeps minimum 3)
-python -m src.jobs.backup --prune 7
-```
-
-### API Endpoints
-
-```bash
-# Get backup status
-curl http://localhost:8080/api/backup/status
-
-# List all backups
-curl http://localhost:8080/api/backup/list
-
-# Create a new backup
-curl -X POST http://localhost:8080/api/backup/create
-
-# Restore from backup
-curl -X POST http://localhost:8080/api/backup/restore \
-  -H "Content-Type: application/json" \
-  -d '{"backup_id": "latest"}'
-```
-
-### Docker Backup
-
-For Docker deployments:
-
-```bash
-# Create backup inside container
-docker compose exec lifeos python -m src.jobs.backup
-
-# Copy backup to host
-docker cp lifeos:/app/backups/lifeos_2026-02-03_020000.db ./backup.db
-```
-
-Backups are stored in the `backups/` directory with automatic integrity verification.
-
-## Stack
-
-- **Backend:** Python + FastAPI
-- **Database:** SQLite (your data stays yours)
-- **AI:** LiteLLM (flexible model routing)
-- **Frontend:** Vanilla HTML/CSS/JS
-- **Notifications:** Telegram/Discord via Bot API/Webhooks
-
-## Configuration
-
-Create `.env`:
-```
-OURA_TOKEN=your_personal_access_token
-LITELLM_API_KEY=your_api_key
-LITELLM_MODEL=gpt-4o-mini
-```
-
-## Documentation
-
-- [Product Requirements](docs/PRD.md)
-- [Architecture](docs/architecture.md)
-- [API Reference](docs/api.md)
-
-## License
-
-MIT
+</div>
 
 ---
 
-*Built with 🌙 for humans who want to live better, not just track more.*
+## 🌙 What is LifeOS?
+
+**LifeOS** is an AI-powered personal operating system that transforms your biometric data into actionable insights. It passively collects data from your Oura ring, calendar, and voice notes—then uses AI to surface patterns you'd never find yourself.
+
+> *"Your deep sleep drops 40% after days with more than 4 hours of meetings."*
+
+Most self-tracking tools demand more than they give. LifeOS inverts this equation:
+
+| Traditional Apps | LifeOS |
+|-----------------|--------|
+| Manual logging required | Passive data collection |
+| Dashboard overwhelm | AI-curated daily brief |
+| You find the patterns | Patterns find you |
+| Another todo app | A thinking partner |
+
+---
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🌅 Morning Brief
+Wake up to an AI-generated summary of your sleep, energy prediction, and one actionable suggestion for the day.
+
+### 🧠 Pattern Detection
+Statistical analysis + LLM intelligence discovers correlations in your data that you'd never notice manually.
+
+### 🎤 Voice Capture
+Record voice notes on the go. Whisper transcribes, AI categorizes as task/note/energy log automatically.
+
+</td>
+<td width="50%">
+
+### 📊 Beautiful Dashboard
+A joyful, warm dark theme that's easy on the eyes and delightful to use every morning.
+
+### 📱 Mobile Delivery
+Get briefs via Telegram or Discord at 7 AM. No app required.
+
+### 🔒 Local-First
+SQLite database means your data stays on your machine. No cloud dependency.
+
+</td>
+</tr>
+</table>
+
+### Full Feature List
+
+| Feature | Description |
+|---------|-------------|
+| 💤 **Oura Integration** | Auto-sync sleep, readiness, and activity scores |
+| 📅 **Google Calendar** | Meeting patterns affect energy prediction |
+| 🎙️ **Voice Notes** | Whisper-powered transcription + auto-categorization |
+| ⚡ **Energy Tracking** | Log energy levels, discover your peak hours |
+| 📈 **Trend Analysis** | 7-day, 30-day, 90-day trend visualization |
+| 🤖 **Personalization** | AI learns your preferences over time |
+| 💾 **Automated Backups** | Daily backups with one-click restore |
+| 🔔 **Smart Notifications** | Quiet hours respected, no spam |
+
+---
+
+## 🎬 Demo
+
+<div align="center">
+
+<!-- Replace with actual GIF/screenshot -->
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🌙 LifeOS                                   Good morning! ☀️   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ╭──────────────────────────────────────────────────────────╮  │
+│  │  📝 Your Morning Brief                                   │  │
+│  │                                                          │  │
+│  │  Last night you got 7h 12m of sleep with 1h 45m deep    │  │
+│  │  sleep—that's 15% above your average. Your readiness    │  │
+│  │  score of 85 suggests today's a great day for focused   │  │
+│  │  work. With 3 meetings totaling 2 hours, you'll have    │  │
+│  │  solid blocks for deep work. Consider tackling your     │  │
+│  │  most challenging task before 11 AM when you typically  │  │
+│  │  peak.                                                   │  │
+│  ╰──────────────────────────────────────────────────────────╯  │
+│                                                                 │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐                           │
+│  │ 💤 85   │ │ ⚡ 78   │ │ 🏃 62   │                           │
+│  │ Sleep   │ │ Ready   │ │Activity │                           │
+│  └─────────┘ └─────────┘ └─────────┘                           │
+│                                                                 │
+│  📈 Energy Trend (7 days)                                       │
+│  ▁▂▄▆█▇▅                                                        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+*[Add your own screenshot: `docs/images/dashboard.png`]*
+
+</div>
+
+---
+
+## 🚀 Quick Start
+
+Get running in **3 commands**:
+
+```bash
+git clone https://github.com/yourusername/lifeOS.git && cd lifeOS
+./setup.sh                    # Creates venv, installs deps, inits DB
+nano .env                     # Add your OURA_TOKEN and OPENAI_API_KEY
+```
+
+Then:
+```bash
+source .venv/bin/activate && python -m uvicorn src.api:app --port 8080
+```
+
+Open **http://localhost:8080** 🎉
+
+### 🐳 Docker (Recommended for Production)
+
+```bash
+cp .env.example .env          # Configure your tokens
+docker compose up -d          # That's it!
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              LifeOS Architecture                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+    │  Oura Ring   │     │   Calendar   │     │ Voice Notes  │
+    │   (Sleep)    │     │  (Meetings)  │     │  (Whisper)   │
+    └──────┬───────┘     └──────┬───────┘     └──────┬───────┘
+           │                    │                    │
+           └────────────────────┼────────────────────┘
+                                │
+                                ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │                      FastAPI Backend                         │
+    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+    │  │   Routers   │  │  Services   │  │   Integrations      │  │
+    │  │ /api/...    │  │  Insights   │  │  • Oura API         │  │
+    │  │             │  │  Patterns   │  │  • Google Calendar  │  │
+    │  │             │  │  Capture    │  │  • Whisper API      │  │
+    │  │             │  │  Personal.  │  │  • Telegram/Discord │  │
+    │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+    └─────────────────────────────┬───────────────────────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+              ▼                   ▼                   ▼
+    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+    │   SQLite     │    │   LiteLLM    │    │   Frontend   │
+    │  (Local DB)  │    │    (AI)      │    │  (Vanilla)   │
+    └──────────────┘    └──────────────┘    └──────────────┘
+
+```
+
+### Tech Stack
+
+| Layer | Technology | Why |
+|-------|------------|-----|
+| **Backend** | Python + FastAPI | Fast, modern, async-ready |
+| **Database** | SQLite | Local-first, zero config |
+| **AI** | LiteLLM | Model-agnostic (OpenAI, Anthropic, local) |
+| **Frontend** | Vanilla HTML/CSS/JS | No build step, instant reload |
+| **Transcription** | OpenAI Whisper | Best-in-class speech-to-text |
+
+---
+
+## 📡 API Overview
+
+LifeOS exposes a comprehensive REST API:
+
+### Core Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/insights/brief` | GET | Get today's morning brief |
+| `/api/insights/patterns` | GET | Get detected patterns |
+| `/api/predictions/energy` | GET | Get energy prediction |
+| `/api/log` | POST | Quick log energy/mood |
+| `/api/capture` | POST | AI-categorized capture |
+| `/api/voice/upload` | POST | Upload voice note |
+
+### Integrations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/oura/sync` | POST | Sync Oura data |
+| `/api/calendar/sync` | POST | Sync Google Calendar |
+| `/api/brief/deliver` | POST | Send brief to Telegram/Discord |
+
+### Full API Documentation
+
+Once running, visit **http://localhost:8080/docs** for interactive Swagger documentation.
+
+<details>
+<summary>📋 Example: Get Morning Brief</summary>
+
+```bash
+curl http://localhost:8080/api/insights/brief?generate=true
+```
+
+Response:
+```json
+{
+  "id": 42,
+  "type": "daily_brief",
+  "date": "2026-02-03",
+  "content": "Last night you got 7h 12m of sleep with 1h 45m deep sleep...",
+  "confidence": 0.85,
+  "created_at": "2026-02-03T07:00:00"
+}
+```
+</details>
+
+<details>
+<summary>🎤 Example: Upload Voice Note</summary>
+
+```bash
+curl -X POST http://localhost:8080/api/voice/upload \
+  -F "file=@note.mp3"
+```
+
+Response:
+```json
+{
+  "id": 1,
+  "filename": "note.mp3",
+  "transcription": "Remember to call mom about Sunday dinner",
+  "transcription_status": "completed",
+  "categorized_type": "task",
+  "categorized_id": 15,
+  "success": true,
+  "message": "Voice note uploaded. Transcribed: 47 chars. Categorized as: task"
+}
+```
+</details>
+
+---
+
+## ⚙️ Configuration
+
+Create a `.env` file:
+
+```bash
+# Required
+OURA_TOKEN=your_oura_personal_access_token
+OPENAI_API_KEY=your_openai_api_key
+
+# Optional - AI Model
+LITELLM_MODEL=gpt-4o-mini          # or claude-3-haiku, etc.
+
+# Optional - Notifications
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_CHAT_ID=123456789
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Optional - Google Calendar
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxx
+```
+
+### Getting API Keys
+
+| Service | How to Get |
+|---------|------------|
+| **Oura** | [cloud.ouraring.com/personal-access-tokens](https://cloud.ouraring.com/personal-access-tokens) |
+| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| **Telegram** | Message [@BotFather](https://t.me/BotFather) on Telegram |
+| **Google Calendar** | [console.cloud.google.com](https://console.cloud.google.com/apis/credentials) |
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Dashboard | Morning Brief | Trends |
+|:---------:|:-------------:|:------:|
+| *Add screenshot* | *Add screenshot* | *Add screenshot* |
+
+| Settings | Voice Notes | Mobile (Telegram) |
+|:--------:|:-----------:|:-----------------:|
+| *Add screenshot* | *Add screenshot* | *Add screenshot* |
+
+</div>
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to get started:
+
+### Development Setup
+
+```bash
+# Fork and clone
+git clone https://github.com/yourusername/lifeOS.git
+cd lifeOS
+
+# Create branch
+git checkout -b feature/amazing-feature
+
+# Setup environment
+./setup.sh
+source .venv/bin/activate
+
+# Run in development mode
+python -m uvicorn src.api:app --reload --port 8080
+```
+
+### Project Structure
+
+```
+lifeOS/
+├── src/
+│   ├── api.py              # FastAPI application
+│   ├── models.py           # SQLAlchemy models
+│   ├── ai.py               # LiteLLM integration
+│   ├── insights_service.py # Brief & pattern generation
+│   ├── routers/            # API endpoints
+│   ├── integrations/       # Oura, Calendar, Whisper
+│   └── jobs/               # Cron job scripts
+├── ui/
+│   ├── index.html          # Dashboard
+│   ├── css/                # Styles (modular)
+│   └── js/                 # Scripts
+├── docs/                   # Documentation
+├── tests/                  # Test suite
+└── docker-compose.yml      # Docker deployment
+```
+
+### Guidelines
+
+- **Commit early, commit often** - Small, focused commits
+- **Test your changes** - Run `pytest` before pushing
+- **Follow the style** - Black formatting, type hints
+- **Document APIs** - Update docstrings and README
+
+---
+
+## 📄 License
+
+MIT License - do whatever you want, just don't blame us.
+
+```
+MIT License
+
+Copyright (c) 2026 LifeOS Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+<div align="center">
+
+### 🌙
+
+**Built for humans who want to live better, not just track more.**
+
+[⬆ Back to top](#)
+
+</div>
