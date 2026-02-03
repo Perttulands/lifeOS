@@ -382,6 +382,33 @@
                             <a href="https://github.com/Perttulands/lifeOS#configuration" target="_blank">Learn more</a>
                         </p>
                     </section>
+
+                    <!-- Token Usage Section -->
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">AI Token Usage</h3>
+                        <div class="token-stats" id="tokenStats">
+                            <div class="token-stat-row">
+                                <div class="token-stat">
+                                    <span class="token-stat-value" id="tokenCostToday">$0.00</span>
+                                    <span class="token-stat-label">Today</span>
+                                </div>
+                                <div class="token-stat">
+                                    <span class="token-stat-value" id="tokenCostMonth">$0.00</span>
+                                    <span class="token-stat-label">Last 30 days</span>
+                                </div>
+                                <div class="token-stat">
+                                    <span class="token-stat-value" id="tokenCallsMonth">0</span>
+                                    <span class="token-stat-label">AI calls</span>
+                                </div>
+                            </div>
+                            <div class="token-breakdown" id="tokenBreakdown">
+                                <!-- Feature breakdown will be populated by JS -->
+                            </div>
+                        </div>
+                        <p class="settings-note">
+                            Token costs are estimated based on model pricing.
+                        </p>
+                    </section>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" id="cancelSettings">Cancel</button>

@@ -79,6 +79,82 @@ export async function openSettings() {
 
     modal.classList.add('visible');
     document.body.style.overflow = 'hidden';
+
+    // Load token stats in background
+    loadTokenStats();
+}
+
+/**
+ * Load and display token usage stats
+ */
+async function loadTokenStats() {
+    try {
+        const res = await fetch(`${CONFIG.API_BASE}/stats/summary`);
+        if (!res.ok) {
+            throw new Error('Failed to load stats');
+        }
+
+        const stats = await res.json();
+
+        // Update summary values
+        document.getElementById('tokenCostToday').textContent =
+            `$${stats.today?.cost_usd?.toFixed(4) || '0.00'}`;
+        document.getElementById('tokenCostMonth').textContent =
+            `$${stats.last_30_days?.cost_usd?.toFixed(2) || '0.00'}`;
+        document.getElementById('tokenCallsMonth').textContent =
+            stats.last_30_days?.calls?.toLocaleString() || '0';
+
+        // Load feature breakdown
+        const breakdownRes = await fetch(`${CONFIG.API_BASE}/stats/by-feature?days=30`);
+        if (breakdownRes.ok) {
+            const features = await breakdownRes.json();
+            renderTokenBreakdown(features);
+        }
+    } catch (error) {
+        console.error('Failed to load token stats:', error);
+        // Show placeholder
+        document.getElementById('tokenCostToday').textContent = '--';
+        document.getElementById('tokenCostMonth').textContent = '--';
+        document.getElementById('tokenCallsMonth').textContent = '--';
+        document.getElementById('tokenBreakdown').innerHTML =
+            '<p class="token-breakdown-empty">Unable to load usage data</p>';
+    }
+}
+
+/**
+ * Render token breakdown by feature
+ */
+function renderTokenBreakdown(features) {
+    const container = document.getElementById('tokenBreakdown');
+
+    if (!features || features.length === 0) {
+        container.innerHTML = '<p class="token-breakdown-empty">No AI usage recorded yet</p>';
+        return;
+    }
+
+    const html = features.map(f => `
+        <div class="token-breakdown-item">
+            <span class="token-feature-name">${formatFeatureName(f.feature)}</span>
+            <span class="token-feature-cost">$${f.total_cost_usd.toFixed(4)} (${f.total_calls} calls)</span>
+        </div>
+    `).join('');
+
+    container.innerHTML = html;
+}
+
+/**
+ * Format feature name for display
+ */
+function formatFeatureName(feature) {
+    const names = {
+        'daily_brief': 'Daily Brief',
+        'weekly_review': 'Weekly Review',
+        'energy_prediction': 'Energy Prediction',
+        'pattern_detection': 'Pattern Detection',
+        'capture': 'Quick Capture',
+        'other': 'Other'
+    };
+    return names[feature] || feature.replace(/_/g, ' ');
 }
 
 /**
