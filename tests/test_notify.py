@@ -17,6 +17,7 @@ from src.integrations.notify import (
     NotifyResult,
     MobileBriefFormatter,
     MobileFormatter,
+    QuietHoursChecker,
     get_notification_service,
 )
 
@@ -313,7 +314,8 @@ class TestNotificationService:
         service = NotificationService(
             telegram_bot_token="token",
             telegram_chat_id="123",
-            discord_webhook_url="https://discord.com/api/webhooks/test"
+            discord_webhook_url="https://discord.com/api/webhooks/test",
+            quiet_hours_enabled=False
         )
 
         results = await service.send_brief(
@@ -360,7 +362,8 @@ class TestNotificationService:
 
             service = NotificationService(
                 telegram_bot_token="token",
-                telegram_chat_id="123"
+                telegram_chat_id="123",
+                quiet_hours_enabled=False
             )
 
             results = service.send_brief_sync(
@@ -527,7 +530,8 @@ class TestWeeklyReviewSend:
 
         service = NotificationService(
             telegram_bot_token="token",
-            telegram_chat_id="123"
+            telegram_chat_id="123",
+            quiet_hours_enabled=False
         )
 
         results = await service.send_weekly_review(
@@ -550,7 +554,8 @@ class TestWeeklyReviewSend:
         )
 
         service = NotificationService(
-            discord_webhook_url="https://discord.com/api/webhooks/test"
+            discord_webhook_url="https://discord.com/api/webhooks/test",
+            quiet_hours_enabled=False
         )
 
         results = await service.send_weekly_review(
@@ -572,7 +577,8 @@ class TestWeeklyReviewSend:
 
             service = NotificationService(
                 telegram_bot_token="token",
-                telegram_chat_id="123"
+                telegram_chat_id="123",
+                quiet_hours_enabled=False
             )
 
             results = service.send_weekly_review_sync(
@@ -582,3 +588,263 @@ class TestWeeklyReviewSend:
 
             assert len(results) == 1
             assert results[0].success
+
+
+# === QuietHoursChecker Tests ===
+
+class TestQuietHoursChecker:
+    """Tests for QuietHoursChecker class."""
+
+    def test_overnight_period_before_midnight(self):
+        """Test quiet hours check during overnight period (before midnight)."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # 23:30 UTC should be in quiet hours
+        test_time = datetime(2026, 2, 3, 23, 30)
+        assert checker.is_quiet_time(test_time) is True
+
+    def test_overnight_period_after_midnight(self):
+        """Test quiet hours check during overnight period (after midnight)."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # 02:00 UTC should be in quiet hours
+        test_time = datetime(2026, 2, 3, 2, 0)
+        assert checker.is_quiet_time(test_time) is True
+
+    def test_overnight_period_outside(self):
+        """Test outside overnight quiet hours."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # 12:00 UTC should NOT be in quiet hours
+        test_time = datetime(2026, 2, 3, 12, 0)
+        assert checker.is_quiet_time(test_time) is False
+
+    def test_daytime_period_inside(self):
+        """Test daytime quiet hours (e.g., lunch break)."""
+        checker = QuietHoursChecker(
+            start_time="12:00",
+            end_time="13:00",
+            timezone_name="UTC"
+        )
+        # 12:30 UTC should be in quiet hours
+        test_time = datetime(2026, 2, 3, 12, 30)
+        assert checker.is_quiet_time(test_time) is True
+
+    def test_daytime_period_outside(self):
+        """Test outside daytime quiet hours."""
+        checker = QuietHoursChecker(
+            start_time="12:00",
+            end_time="13:00",
+            timezone_name="UTC"
+        )
+        # 14:00 UTC should NOT be in quiet hours
+        test_time = datetime(2026, 2, 3, 14, 0)
+        assert checker.is_quiet_time(test_time) is False
+
+    def test_boundary_at_start(self):
+        """Test boundary condition at start time."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # 23:00 exactly should be in quiet hours
+        test_time = datetime(2026, 2, 3, 23, 0)
+        assert checker.is_quiet_time(test_time) is True
+
+    def test_boundary_at_end(self):
+        """Test boundary condition at end time."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # 08:00 exactly should NOT be in quiet hours (end is exclusive)
+        test_time = datetime(2026, 2, 3, 8, 0)
+        assert checker.is_quiet_time(test_time) is False
+
+    def test_time_until_quiet_ends(self):
+        """Test calculating time until quiet hours end."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        # At 02:00, should be 6 hours until 08:00
+        test_time = datetime(2026, 2, 3, 2, 0)
+        remaining = checker.time_until_quiet_ends(test_time)
+        assert remaining is not None
+        assert int(remaining.total_seconds() / 60) == 360  # 6 hours * 60 minutes
+
+    def test_get_status(self):
+        """Test status dict from get_status()."""
+        checker = QuietHoursChecker(
+            start_time="23:00",
+            end_time="08:00",
+            timezone_name="UTC"
+        )
+        status = checker.get_status()
+
+        assert "enabled" in status
+        assert "is_quiet_time" in status
+        assert "timezone" in status
+        assert status["timezone"] == "UTC"
+        assert status["quiet_start"] == "23:00"
+        assert status["quiet_end"] == "08:00"
+
+    def test_disabled_checker(self):
+        """Test checker when disabled."""
+        checker = QuietHoursChecker(
+            start_time="00:00",
+            end_time="23:59",
+            timezone_name="UTC",
+            enabled=False
+        )
+        # Even when time is in range, should return False when disabled
+        test_time = datetime(2026, 2, 3, 12, 0)
+        assert checker.is_quiet_time(test_time) is False
+
+
+# === NotificationService Quiet Hours Tests ===
+
+class TestNotificationServiceQuietHours:
+    """Tests for NotificationService quiet hours integration."""
+
+    def test_quiet_hours_enabled_by_default(self):
+        """Test that quiet hours can be enabled."""
+        service = NotificationService(
+            quiet_hours_start="23:00",
+            quiet_hours_end="08:00",
+            quiet_hours_enabled=True
+        )
+        assert service.quiet_hours.enabled is True
+
+    def test_quiet_hours_disabled(self):
+        """Test quiet hours disabled."""
+        service = NotificationService(
+            quiet_hours_start="23:00",
+            quiet_hours_end="08:00",
+            quiet_hours_enabled=False
+        )
+        assert service.quiet_hours.enabled is False
+
+    def test_is_quiet_time_when_disabled(self):
+        """Test is_quiet_time returns False when disabled."""
+        service = NotificationService(
+            quiet_hours_start="23:00",
+            quiet_hours_end="08:00",
+            quiet_hours_enabled=False
+        )
+        # Even during quiet hours, should return False when disabled
+        assert service.is_quiet_time() is False
+
+    def test_get_quiet_hours_status(self):
+        """Test getting quiet hours status."""
+        service = NotificationService(
+            quiet_hours_start="22:00",
+            quiet_hours_end="07:00",
+            user_timezone="UTC",
+            quiet_hours_enabled=True
+        )
+        status = service.get_quiet_hours_status()
+
+        assert "enabled" in status
+        assert "quiet_start" in status
+        assert "quiet_end" in status
+        assert status["quiet_start"] == "22:00"
+        assert status["quiet_end"] == "07:00"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_brief_blocked_by_quiet_hours(self):
+        """Test that send_brief respects quiet hours."""
+        service = NotificationService(
+            telegram_bot_token="token",
+            telegram_chat_id="123",
+            quiet_hours_start="00:00",
+            quiet_hours_end="23:59",  # Always quiet
+            quiet_hours_enabled=True
+        )
+
+        results = await service.send_brief(
+            content="Should be blocked",
+            date="2026-02-03"
+        )
+
+        assert len(results) == 1
+        assert results[0].success is False
+        assert results[0].blocked_by_quiet_hours is True
+        assert "quiet hours" in results[0].error.lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_brief_bypass_quiet_hours(self):
+        """Test that bypass_quiet_hours overrides quiet hours."""
+        respx.post("https://api.telegram.org/bottoken/sendMessage").mock(
+            return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+        )
+
+        service = NotificationService(
+            telegram_bot_token="token",
+            telegram_chat_id="123",
+            quiet_hours_start="00:00",
+            quiet_hours_end="23:59",  # Always quiet
+            quiet_hours_enabled=True
+        )
+
+        results = await service.send_brief(
+            content="Should bypass",
+            date="2026-02-03",
+            bypass_quiet_hours=True
+        )
+
+        assert len(results) == 1
+        assert results[0].success is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_send_weekly_review_blocked_by_quiet_hours(self):
+        """Test that send_weekly_review respects quiet hours."""
+        service = NotificationService(
+            telegram_bot_token="token",
+            telegram_chat_id="123",
+            quiet_hours_start="00:00",
+            quiet_hours_end="23:59",  # Always quiet
+            quiet_hours_enabled=True
+        )
+
+        results = await service.send_weekly_review(
+            content="Should be blocked",
+            week_ending="2026-02-03"
+        )
+
+        assert len(results) == 1
+        assert results[0].success is False
+        assert results[0].blocked_by_quiet_hours is True
+
+    def test_send_brief_sync_respects_quiet_hours(self):
+        """Test sync wrapper respects quiet hours."""
+        service = NotificationService(
+            telegram_bot_token="token",
+            telegram_chat_id="123",
+            quiet_hours_start="00:00",
+            quiet_hours_end="23:59",
+            quiet_hours_enabled=True
+        )
+
+        results = service.send_brief_sync(
+            content="Should be blocked",
+            date="2026-02-03"
+        )
+
+        assert len(results) == 1
+        assert results[0].blocked_by_quiet_hours is True
