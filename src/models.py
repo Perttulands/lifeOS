@@ -133,3 +133,46 @@ class Goal(Base):
     metadata = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Task(Base):
+    """Quick-captured tasks."""
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    status = Column(String(20), default="pending")  # pending, in_progress, completed, archived
+    priority = Column(String(20), default="normal")  # low, normal, high, urgent
+    due_date = Column(String(10))  # YYYY-MM-DD
+    tags = Column(JSON, default=list)
+    source = Column(String(50), default="manual")  # manual, telegram, discord, voice
+    raw_input = Column(Text)  # Original captured text
+    metadata = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_task_status', 'status'),
+        Index('idx_task_created', 'created_at'),
+    )
+
+
+class Note(Base):
+    """Quick-captured notes."""
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    content = Column(Text, nullable=False)
+    title = Column(String(200))  # AI-generated title
+    tags = Column(JSON, default=list)
+    source = Column(String(50), default="manual")  # manual, telegram, discord, voice
+    raw_input = Column(Text)  # Original captured text
+    metadata = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_note_created', 'created_at'),
+    )
