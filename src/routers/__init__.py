@@ -18,6 +18,7 @@ from .preferences import router as preferences_router
 from .backfill import router as backfill_router
 from .voice import router as voice_router
 from .onboarding import router as onboarding_router
+from .journal import router as journal_router
 
 __all__ = [
     "health_router",
@@ -34,4 +35,5 @@ __all__ = [
     "backfill_router",
     "voice_router",
     "onboarding_router",
+    "journal_router",
 ]
