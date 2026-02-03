@@ -38,4 +38,8 @@ def get_db():
 
 def init_db():
     """Initialize database tables."""
+    # Import all models to ensure they're registered with Base
+    from . import models  # noqa: F401
+    from .token_tracker import TokenUsage  # noqa: F401
+
     Base.metadata.create_all(bind=engine)

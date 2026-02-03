@@ -69,6 +69,7 @@ class LifeOSAI:
     AI engine for LifeOS.
 
     Uses LiteLLM for model-agnostic AI calls.
+    Supports personalization via preference context.
     """
 
     def __init__(
@@ -89,7 +90,7 @@ class LifeOSAI:
 
     # === SYSTEM PROMPTS ===
 
-    SYSTEM_PROMPT_BRIEF = """You are LifeOS, a personal AI assistant that helps optimize daily life.
+    SYSTEM_PROMPT_BRIEF_BASE = """You are LifeOS, a personal AI assistant that helps optimize daily life.
 
 Given the user's sleep data, calendar, and recent patterns, generate a brief, actionable morning summary. Be conversational, not clinical.
 
@@ -102,6 +103,9 @@ Focus on:
 Keep it under 150 words. No bullet points - write naturally like a helpful friend.
 
 IMPORTANT: Be specific with numbers. If sleep was 6h 12m, say that. If deep sleep was 1h 45m, mention it. Specificity builds trust."""
+
+    # Alias for backwards compatibility
+    SYSTEM_PROMPT_BRIEF = SYSTEM_PROMPT_BRIEF_BASE
 
     SYSTEM_PROMPT_PATTERN = """You are LifeOS pattern analyzer. Your job is to find actionable patterns in personal data.
 
@@ -146,6 +150,53 @@ Include:
 5. One celebration (what went well)
 
 Tone: Supportive coach, not demanding boss. ~200 words."""
+
+    # === PERSONALIZATION ===
+
+    def build_personalized_brief_prompt(
+        self,
+        personalization_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Build a personalized system prompt for daily briefs.
+
+        Args:
+            personalization_prompt: User-specific preferences from PersonalizationService
+
+        Returns:
+            Complete system prompt with personalization
+        """
+        base_prompt = self.SYSTEM_PROMPT_BRIEF_BASE
+
+        if not personalization_prompt:
+            return base_prompt
+
+        # Insert personalization after base instructions
+        return f"""{base_prompt}
+
+--- USER PREFERENCES ---
+{personalization_prompt}
+--- END PREFERENCES ---
+
+Apply these preferences while maintaining helpfulness and specificity."""
+
+    def build_personalized_weekly_prompt(
+        self,
+        personalization_prompt: Optional[str] = None
+    ) -> str:
+        """Build a personalized system prompt for weekly reviews."""
+        base_prompt = self.SYSTEM_PROMPT_WEEKLY
+
+        if not personalization_prompt:
+            return base_prompt
+
+        return f"""{base_prompt}
+
+--- USER PREFERENCES ---
+{personalization_prompt}
+--- END PREFERENCES ---
+
+Apply these preferences in your weekly summary."""
 
     # === CORE METHODS ===
 
@@ -253,7 +304,8 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
         self,
         today: DayContext,
         history: List[DayContext],
-        timezone: str = "UTC"
+        timezone: str = "UTC",
+        personalization_prompt: Optional[str] = None
     ) -> InsightResult:
         """
         Generate a personalized morning brief.
@@ -262,6 +314,7 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
             today: Today's context (sleep, calendar, etc.)
             history: Last 7 days of context for comparison
             timezone: User's timezone
+            personalization_prompt: Optional personalization context from PersonalizationService
 
         Returns:
             InsightResult with the brief content
@@ -315,9 +368,12 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
 
         user_prompt = "\n".join(prompt_parts)
 
+        # Build personalized system prompt
+        system_prompt = self.build_personalized_brief_prompt(personalization_prompt)
+
         # Call LLM
         content, tokens, _, _ = self._call_llm(
-            system_prompt=self.SYSTEM_PROMPT_BRIEF,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=0.7,
             max_tokens=300,
@@ -529,13 +585,15 @@ Predict my energy for today. Return JSON:
 
     def generate_weekly_review(
         self,
-        week_data: List[DayContext]
+        week_data: List[DayContext],
+        personalization_prompt: Optional[str] = None
     ) -> InsightResult:
         """
         Generate a weekly review summary.
 
         Args:
             week_data: 7 days of context data
+            personalization_prompt: Optional personalization context from PersonalizationService
 
         Returns:
             InsightResult with weekly review
@@ -581,8 +639,11 @@ DAY BY DAY:""")
 
         user_prompt = "\n".join(prompt_parts)
 
+        # Build personalized system prompt
+        system_prompt = self.build_personalized_weekly_prompt(personalization_prompt)
+
         content, tokens, _, _ = self._call_llm(
-            system_prompt=self.SYSTEM_PROMPT_WEEKLY,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=0.7,
             max_tokens=400,
@@ -595,7 +656,8 @@ DAY BY DAY:""")
             context={
                 "days": len(week_data),
                 "avg_sleep": avg_sleep,
-                "avg_deep_sleep": avg_deep
+                "avg_deep_sleep": avg_deep,
+                "personalized": personalization_prompt is not None
             },
             tokens_used=tokens
         )

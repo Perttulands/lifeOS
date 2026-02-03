@@ -16,6 +16,7 @@ from .ai import (
     SleepData, DayContext, InsightResult, PatternResult
 )
 from .pattern_analyzer import PatternAnalyzer, get_analyzer, DetectedPattern
+from .personalization import PersonalizationService, get_personalization
 
 
 class InsightsService:
@@ -25,10 +26,12 @@ class InsightsService:
         self,
         db: Session,
         ai: Optional[LifeOSAI] = None,
-        analyzer: Optional[PatternAnalyzer] = None
+        analyzer: Optional[PatternAnalyzer] = None,
+        personalization: Optional[PersonalizationService] = None
     ):
         self.db = db
         self.ai = ai or get_ai()
+        self.personalization = personalization or get_personalization(db)
         try:
             self.analyzer = analyzer or get_analyzer()
         except ImportError:
@@ -139,12 +142,13 @@ class InsightsService:
 
     # === INSIGHT GENERATION ===
 
-    def generate_daily_brief(self, date: str = None) -> Insight:
+    def generate_daily_brief(self, date: str = None, user_id: int = 1) -> Insight:
         """
-        Generate and store today's daily brief.
+        Generate and store today's daily brief with personalization.
 
         Args:
             date: Date string (defaults to today)
+            user_id: User ID for personalization
 
         Returns:
             Insight object with the brief
@@ -167,20 +171,29 @@ class InsightsService:
         # Get history for comparison
         history = self._get_history(days=7, before_date=date)
 
-        # Generate brief
-        result = self.ai.generate_daily_brief(today, history)
+        # Get personalization context
+        personalization_prompt = self.personalization.build_personalization_prompt(user_id)
+
+        # Generate brief with personalization
+        result = self.ai.generate_daily_brief(
+            today, history,
+            personalization_prompt=personalization_prompt
+        )
 
         # Store insight
         insight = Insight(
             type="daily_brief",
             date=date,
             content=result.content,
-            context=result.context,
+            context={**result.context, "personalized": True},
             confidence=result.confidence
         )
         self.db.add(insight)
         self.db.commit()
         self.db.refresh(insight)
+
+        # Learn from pattern generation (side effect)
+        self.personalization.learn_from_patterns(user_id)
 
         return insight
 
@@ -375,12 +388,13 @@ class InsightsService:
 
         return prediction
 
-    def generate_weekly_review(self, week_ending: str = None) -> Insight:
+    def generate_weekly_review(self, week_ending: str = None, user_id: int = 1) -> Insight:
         """
-        Generate weekly review.
+        Generate weekly review with personalization.
 
         Args:
             week_ending: Last date of the week (defaults to today)
+            user_id: User ID for personalization
 
         Returns:
             Insight with weekly review
@@ -407,20 +421,29 @@ class InsightsService:
 
         week_data.reverse()  # Chronological order
 
-        # Generate review
-        result = self.ai.generate_weekly_review(week_data)
+        # Get personalization context
+        personalization_prompt = self.personalization.build_personalization_prompt(user_id)
+
+        # Generate review with personalization
+        result = self.ai.generate_weekly_review(
+            week_data,
+            personalization_prompt=personalization_prompt
+        )
 
         # Store
         insight = Insight(
             type="weekly_review",
             date=week_ending,
             content=result.content,
-            context=result.context,
+            context={**result.context, "personalized": True},
             confidence=result.confidence
         )
         self.db.add(insight)
         self.db.commit()
         self.db.refresh(insight)
+
+        # Decay stale preferences weekly
+        self.personalization.decay_preferences(user_id)
 
         return insight
 
