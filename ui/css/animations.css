@@ -120,5 +120,155 @@
         rgba(255, 255, 255, 0.05) 50%,
         transparent 100%
     );
+    background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
+    border-radius: inherit;
+}
+
+/* Skeleton loading for cards */
+.skeleton-pulse {
+    animation: gentlePulse 1.5s ease-in-out infinite;
+}
+
+/* Card entrance animations */
+.score-card {
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.score-card:nth-child(1) { animation-delay: 0.1s; }
+.score-card:nth-child(2) { animation-delay: 0.2s; }
+.score-card:nth-child(3) { animation-delay: 0.3s; }
+
+.brief-card {
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.trend-card {
+    animation: fadeInUp 0.5s ease-out 0.4s backwards;
+}
+
+.insight-card {
+    animation: fadeInUp 0.4s ease-out backwards;
+}
+
+/* Refresh button spin */
+.refresh-btn.spinning svg {
+    animation: spin 1s linear infinite;
+}
+
+/* Value counter animation */
+.value-counting {
+    animation: countUp 0.3s ease-out;
+}
+
+/* Glow pulse for active elements */
+@keyframes glowPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px var(--accent-glow);
+    }
+    50% {
+        box-shadow: 0 0 40px var(--accent-glow), 0 0 60px rgba(99, 102, 241, 0.2);
+    }
+}
+
+.glow-active {
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Demo Mode Banner */
+.demo-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 100%);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    animation: slideDown 0.4s ease-out;
+}
+
+.demo-banner-icon {
+    font-size: 1rem;
+}
+
+.demo-banner-text {
+    letter-spacing: 0.02em;
+}
+
+.demo-banner-close {
+    position: absolute;
+    right: var(--space-md);
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity var(--transition-fast);
+    padding: var(--space-xs);
+    line-height: 1;
+}
+
+.demo-banner-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Adjust app content when demo banner is visible */
+body:has(.demo-banner) .app {
+    padding-top: 40px;
+}
+
+/* Quality bar animation */
+.quality-bar {
+    position: relative;
+    height: 4px;
+    background: var(--glass-border);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.quality-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--quality-percent, 0%);
+    background: var(--quality-color, var(--accent-primary));
+    border-radius: var(--radius-full);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sparkline fade in */
+.score-sparkline svg {
+    animation: fadeInUp 0.6s ease-out 0.5s backwards;
+}
+
+/* Energy dot cascade animation */
+.energy-dot {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.energy-dot.active {
+    transform: scale(1.2);
+    box-shadow: 0 0 12px var(--warning-glow);
 }
