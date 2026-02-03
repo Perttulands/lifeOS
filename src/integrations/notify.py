@@ -9,7 +9,7 @@ import httpx
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 class NotifyChannel(Enum):
@@ -27,9 +27,9 @@ class NotifyResult:
     error: Optional[str] = None
 
 
-class MobileBriefFormatter:
+class MobileFormatter:
     """
-    Format daily briefs for mobile-friendly display.
+    Format insights for mobile-friendly display.
 
     Optimizes for quick scanning on Telegram/Discord:
     - Clear emoji indicators
@@ -165,6 +165,158 @@ class MobileBriefFormatter:
             embed["footer"]["text"] += f" • {int(confidence * 100)}% confidence"
 
         return {"embeds": [embed]}
+
+    @staticmethod
+    def format_weekly_review(
+        content: str,
+        week_ending: str,
+        avg_sleep_hours: Optional[float] = None,
+        avg_readiness: Optional[int] = None,
+        patterns: Optional[List[dict]] = None,
+        confidence: Optional[float] = None
+    ) -> str:
+        """
+        Format a weekly review for Telegram delivery.
+
+        Args:
+            content: The AI-generated review content
+            week_ending: End date of the week (YYYY-MM-DD)
+            avg_sleep_hours: Average sleep duration for the week
+            avg_readiness: Average readiness score for the week
+            patterns: List of detected patterns with name/description
+            confidence: AI confidence score (0-1)
+
+        Returns:
+            Mobile-formatted message string
+        """
+        # Parse date for display
+        try:
+            dt = datetime.strptime(week_ending, "%Y-%m-%d")
+            week_start = dt - timedelta(days=6)
+            date_display = f"{week_start.strftime('%b %d')} - {dt.strftime('%b %d')}"
+        except ValueError:
+            date_display = week_ending
+
+        # Build header
+        lines = [
+            "📊 *Weekly Review*",
+            f"_{date_display}_",
+            "─" * 20,
+        ]
+
+        # Add weekly stats
+        stats = []
+        if avg_sleep_hours is not None:
+            hours = int(avg_sleep_hours)
+            mins = int((avg_sleep_hours - hours) * 60)
+            stats.append(f"😴 Avg {hours}h {mins}m sleep")
+
+        if avg_readiness is not None:
+            ready_emoji = "💪" if avg_readiness >= 70 else "🙂" if avg_readiness >= 50 else "🪫"
+            stats.append(f"{ready_emoji} Avg {avg_readiness}% ready")
+
+        if stats:
+            lines.append(" • ".join(stats))
+            lines.append("")
+
+        # Add main content
+        lines.append(content)
+
+        # Add patterns section if available
+        if patterns:
+            lines.append("")
+            lines.append("*Patterns Detected:*")
+            for p in patterns[:3]:  # Limit to top 3
+                name = p.get('name', 'Pattern')
+                lines.append(f"• {name}")
+
+        # Add footer
+        if confidence is not None:
+            lines.append("")
+            lines.append(f"_AI confidence: {int(confidence * 100)}%_")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def format_weekly_review_discord(
+        content: str,
+        week_ending: str,
+        avg_sleep_hours: Optional[float] = None,
+        avg_readiness: Optional[int] = None,
+        patterns: Optional[List[dict]] = None,
+        confidence: Optional[float] = None
+    ) -> dict:
+        """
+        Format a weekly review as a Discord embed.
+
+        Returns dict suitable for Discord webhook payload.
+        """
+        # Parse date
+        try:
+            dt = datetime.strptime(week_ending, "%Y-%m-%d")
+            week_start = dt - timedelta(days=6)
+            date_display = f"{week_start.strftime('%B %d')} - {dt.strftime('%B %d, %Y')}"
+        except ValueError:
+            date_display = week_ending
+
+        # Build fields
+        fields = []
+
+        if avg_sleep_hours is not None:
+            hours = int(avg_sleep_hours)
+            mins = int((avg_sleep_hours - hours) * 60)
+            fields.append({
+                "name": "😴 Avg Sleep",
+                "value": f"{hours}h {mins}m",
+                "inline": True
+            })
+
+        if avg_readiness is not None:
+            fields.append({
+                "name": "💪 Avg Readiness",
+                "value": f"{avg_readiness}%",
+                "inline": True
+            })
+
+        # Add patterns as a field
+        if patterns:
+            pattern_text = "\n".join([f"• {p.get('name', 'Pattern')}" for p in patterns[:3]])
+            fields.append({
+                "name": "🔍 Patterns",
+                "value": pattern_text or "None detected",
+                "inline": False
+            })
+
+        # Determine color based on avg readiness
+        if avg_readiness is not None:
+            if avg_readiness >= 70:
+                color = 0x2ECC71  # Green
+            elif avg_readiness >= 50:
+                color = 0xF1C40F  # Yellow
+            else:
+                color = 0xE74C3C  # Red
+        else:
+            color = 0x9B59B6  # Purple for weekly review
+
+        embed = {
+            "title": "📊 Weekly Review",
+            "description": content,
+            "color": color,
+            "fields": fields,
+            "footer": {
+                "text": f"LifeOS • {date_display}"
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        if confidence is not None:
+            embed["footer"]["text"] += f" • {int(confidence * 100)}% confidence"
+
+        return {"embeds": [embed]}
+
+
+# Alias for backwards compatibility
+MobileBriefFormatter = MobileFormatter
 
 
 class NotificationService:
@@ -438,6 +590,96 @@ class NotificationService:
                 date=date,
                 sleep_hours=sleep_hours,
                 readiness_score=readiness_score,
+                confidence=confidence,
+                channels=channels
+            )
+        )
+
+    async def send_weekly_review(
+        self,
+        content: str,
+        week_ending: str,
+        avg_sleep_hours: Optional[float] = None,
+        avg_readiness: Optional[int] = None,
+        patterns: Optional[List[dict]] = None,
+        confidence: Optional[float] = None,
+        channels: Optional[List[NotifyChannel]] = None
+    ) -> List[NotifyResult]:
+        """
+        Send a formatted weekly review to all configured channels.
+
+        Args:
+            content: The review content from AI
+            week_ending: End date of the week (YYYY-MM-DD)
+            avg_sleep_hours: Average sleep duration for the week
+            avg_readiness: Average readiness score for the week
+            patterns: List of detected patterns
+            confidence: AI confidence score
+            channels: Specific channels to use (defaults to all enabled)
+
+        Returns:
+            List of NotifyResult for each channel attempted
+        """
+        target_channels = channels or self.enabled_channels
+        results = []
+
+        for channel in target_channels:
+            if channel == NotifyChannel.TELEGRAM and self.telegram_enabled:
+                formatted = self.formatter.format_weekly_review(
+                    content=content,
+                    week_ending=week_ending,
+                    avg_sleep_hours=avg_sleep_hours,
+                    avg_readiness=avg_readiness,
+                    patterns=patterns,
+                    confidence=confidence
+                )
+                result = await self.send_telegram(formatted)
+                results.append(result)
+
+            elif channel == NotifyChannel.DISCORD and self.discord_enabled:
+                embed_payload = self.formatter.format_weekly_review_discord(
+                    content=content,
+                    week_ending=week_ending,
+                    avg_sleep_hours=avg_sleep_hours,
+                    avg_readiness=avg_readiness,
+                    patterns=patterns,
+                    confidence=confidence
+                )
+                result = await self.send_discord(embed=embed_payload)
+                results.append(result)
+
+        return results
+
+    def send_weekly_review_sync(
+        self,
+        content: str,
+        week_ending: str,
+        avg_sleep_hours: Optional[float] = None,
+        avg_readiness: Optional[int] = None,
+        patterns: Optional[List[dict]] = None,
+        confidence: Optional[float] = None,
+        channels: Optional[List[NotifyChannel]] = None
+    ) -> List[NotifyResult]:
+        """
+        Synchronous wrapper for send_weekly_review.
+
+        Use this from cron jobs or non-async contexts.
+        """
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(
+            self.send_weekly_review(
+                content=content,
+                week_ending=week_ending,
+                avg_sleep_hours=avg_sleep_hours,
+                avg_readiness=avg_readiness,
+                patterns=patterns,
                 confidence=confidence,
                 channels=channels
             )
