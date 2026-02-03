@@ -16,6 +16,7 @@ from .calendar import router as calendar_router
 from .stats import router as stats_router
 from .preferences import router as preferences_router
 from .backfill import router as backfill_router
+from .voice import router as voice_router
 
 __all__ = [
     "health_router",
@@ -30,4 +31,5 @@ __all__ = [
     "stats_router",
     "preferences_router",
     "backfill_router",
+    "voice_router",
 ]

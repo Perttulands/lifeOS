@@ -26,6 +26,7 @@ from .routers import (
     stats_router,
     preferences_router,
     backfill_router,
+    voice_router,
 )
 
 
@@ -59,6 +60,7 @@ app.include_router(calendar_router)
 app.include_router(stats_router)
 app.include_router(preferences_router)
 app.include_router(backfill_router)
+app.include_router(voice_router)
 
 
 # === Startup ===

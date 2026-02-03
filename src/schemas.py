@@ -408,3 +408,40 @@ class InsightFeedbackResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# === Voice Note Schemas ===
+
+class VoiceNoteResponse(BaseModel):
+    id: int
+    filename: str
+    file_size: Optional[int]
+    duration_seconds: Optional[float]
+    mime_type: Optional[str]
+    transcription: Optional[str]
+    transcription_status: str
+    transcription_language: Optional[str]
+    categorized_type: Optional[str]
+    categorized_id: Optional[int]
+    source: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class VoiceNoteUploadResponse(BaseModel):
+    id: int
+    filename: str
+    transcription: Optional[str]
+    transcription_status: str
+    categorized_type: Optional[str]
+    categorized_id: Optional[int]
+    success: bool
+    message: str
+
+
+class VoiceNoteStatusResponse(BaseModel):
+    whisper_configured: bool
+    supported_formats: List[str]
+    max_file_size_mb: int
