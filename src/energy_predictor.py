@@ -88,7 +88,7 @@ class EnergyPredictor:
     Target: energy level on 1-10 scale
     """
 
-    VERSION = "1.0"
+    VERSION = "1.1"  # Updated for meeting density feature
     MIN_TRAINING_SAMPLES = 7
 
     # Feature names in order
@@ -97,7 +97,8 @@ class EnergyPredictor:
         "deep_sleep",
         "readiness_score",
         "day_of_week",
-        "prev_day_energy"
+        "prev_day_energy",
+        "meeting_hours"  # Calendar integration feature
     ]
 
     def __init__(self):
@@ -159,6 +160,8 @@ class EnergyPredictor:
                     by_date[dp_date]["deep_sleep"] = metadata.get("deep_sleep_hours", 0.0)
             elif dp_type == "readiness":
                 by_date[dp_date]["readiness_score"] = float(value)
+            elif dp_type == "meeting_density":
+                by_date[dp_date]["meeting_hours"] = float(value) if value else 0.0
 
         # Add energy from journal entries
         for entry in journal_entries:
@@ -208,13 +211,17 @@ class EnergyPredictor:
                 if "energy" in by_date[prev_date]:
                     prev_energy = by_date[prev_date]["energy"]
 
+            # Meeting hours (from calendar integration)
+            meeting_hours = day_data.get("meeting_hours", 0.0)
+
             # Build feature vector
             features = [
                 sleep_duration,
                 deep_sleep if deep_sleep is not None else 0.0,
                 readiness,
                 float(day_of_week),
-                prev_energy
+                prev_energy,
+                meeting_hours
             ]
 
             features_list.append(features)
@@ -294,7 +301,8 @@ class EnergyPredictor:
         deep_sleep: float,
         readiness_score: float,
         day_of_week: int,
-        prev_day_energy: float = 5.0
+        prev_day_energy: float = 5.0,
+        meeting_hours: float = 0.0
     ) -> EnergyPrediction:
         """
         Predict energy level for given features.
@@ -305,6 +313,7 @@ class EnergyPredictor:
             readiness_score: Oura readiness score (0-100)
             day_of_week: 0-6 (Monday-Sunday)
             prev_day_energy: Previous day's energy (1-10)
+            meeting_hours: Total meeting hours for the day (from calendar)
 
         Returns:
             EnergyPrediction with predicted value and confidence
@@ -318,7 +327,8 @@ class EnergyPredictor:
             deep_sleep,
             readiness_score,
             float(day_of_week),
-            prev_day_energy
+            prev_day_energy,
+            meeting_hours
         ])
 
         # Standardize
@@ -343,7 +353,8 @@ class EnergyPredictor:
                 "deep_sleep": deep_sleep,
                 "readiness_score": readiness_score,
                 "day_of_week": day_of_week,
-                "prev_day_energy": prev_day_energy
+                "prev_day_energy": prev_day_energy,
+                "meeting_hours": meeting_hours
             },
             model_version=self.VERSION
         )
@@ -372,6 +383,7 @@ class EnergyPredictor:
         sleep_duration = None
         deep_sleep = 0.0
         readiness_score = None
+        meeting_hours = 0.0
 
         for dp in data_points:
             dp_date = dp.get("date")
@@ -391,6 +403,8 @@ class EnergyPredictor:
                     deep_sleep = metadata.get("deep_sleep_hours", 0.0)
             elif dp_type == "readiness":
                 readiness_score = float(value)
+            elif dp_type == "meeting_density":
+                meeting_hours = float(value) if value else 0.0
 
         # Need at minimum sleep and readiness
         if sleep_duration is None or readiness_score is None:
@@ -405,7 +419,8 @@ class EnergyPredictor:
             deep_sleep=deep_sleep,
             readiness_score=readiness_score,
             day_of_week=day_of_week,
-            prev_day_energy=prev_energy if prev_energy else 5.0
+            prev_day_energy=prev_energy if prev_energy else 5.0,
+            meeting_hours=meeting_hours
         )
         prediction.date = target_date
 

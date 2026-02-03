@@ -207,6 +207,18 @@ class PatternAnalyzer:
             else:
                 variables['energy'].append(np.nan)
 
+            # Meeting density from calendar integration
+            if 'meeting_density' in day_data:
+                variables['meeting_density'].append(day_data['meeting_density']['value'])
+                meta = day_data['meeting_density'].get('metadata', {})
+                if 'meeting_count' in meta:
+                    variables['meeting_count'].append(meta['meeting_count'])
+                else:
+                    variables['meeting_count'].append(np.nan)
+            else:
+                variables['meeting_density'].append(np.nan)
+                variables['meeting_count'].append(np.nan)
+
         # Convert to numpy arrays
         for key in variables:
             variables[key] = np.array(variables[key])
@@ -236,6 +248,12 @@ class PatternAnalyzer:
             ('sleep_score', 'activity', 'Sleep score correlates with activity'),
             ('activity', 'sleep_score', 'Activity level affects sleep quality'),
             ('readiness', 'activity', 'Readiness predicts activity capacity'),
+            # Meeting/calendar correlations for energy-aware scheduling
+            ('meeting_density', 'readiness', 'Meeting load affects next-day readiness'),
+            ('meeting_density', 'sleep_duration', 'Meeting load impacts sleep duration'),
+            ('meeting_density', 'energy', 'Meeting load affects perceived energy'),
+            ('meeting_count', 'readiness', 'Number of meetings impacts readiness'),
+            ('meeting_count', 'energy', 'Number of meetings affects energy'),
         ]
 
         for var1, var2, hypothesis in correlation_pairs:
@@ -310,7 +328,9 @@ class PatternAnalyzer:
             'sleep_score': 'sleep score',
             'readiness': 'readiness score',
             'activity': 'activity score',
-            'energy': 'energy level'
+            'energy': 'energy level',
+            'meeting_density': 'meeting load (hours)',
+            'meeting_count': 'number of meetings'
         }
 
         v1_name = var_names.get(var1, var1)
@@ -429,7 +449,9 @@ class PatternAnalyzer:
             'sleep_score': 'sleep score',
             'readiness': 'readiness',
             'activity': 'activity',
-            'energy': 'energy'
+            'energy': 'energy',
+            'meeting_density': 'meeting load',
+            'meeting_count': 'meeting count'
         }
 
         v_name = var_names.get(var_name, var_name)
@@ -493,6 +515,9 @@ class PatternAnalyzer:
 
             if 'activity' in data:
                 day_values['activity'][day_of_week].append(data['activity']['value'])
+
+            if 'meeting_density' in data:
+                day_values['meeting_density'][day_of_week].append(data['meeting_density']['value'])
 
         # Analyze each variable
         for var_name, day_data in day_values.items():
@@ -564,7 +589,9 @@ class PatternAnalyzer:
             'deep_sleep': 'deep sleep',
             'sleep_score': 'sleep score',
             'readiness': 'readiness',
-            'activity': 'activity'
+            'activity': 'activity',
+            'meeting_density': 'meeting load',
+            'meeting_count': 'meeting count'
         }
 
         v_name = var_names.get(result.variable, result.variable)
@@ -645,7 +672,9 @@ class PatternAnalyzer:
                     'deep_sleep': 'deep sleep',
                     'sleep_score': 'sleep score',
                     'readiness': 'readiness',
-                    'activity': 'activity'
+                    'activity': 'activity',
+                    'meeting_density': 'meeting load',
+                    'meeting_count': 'meeting count'
                 }
                 v_name = var_names.get(var_name, var_name)
 

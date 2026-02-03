@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 
 from sqlalchemy.orm import Session
 
-from .models import DataPoint, Insight, Pattern, JournalEntry
+from .models import DataPoint, Insight, Pattern, JournalEntry, CalendarEvent
 from .ai import (
     LifeOSAI, get_ai,
     SleepData, DayContext, InsightResult, PatternResult
@@ -63,6 +63,55 @@ class InsightsService:
             wake_time=meta.get('wake_time')
         )
 
+    def _get_calendar_events(self, date: str) -> List[Dict[str, Any]]:
+        """Get calendar events for a specific date formatted for AI context."""
+        from datetime import datetime as dt
+
+        # Parse date
+        start = dt.strptime(date, "%Y-%m-%d")
+        end = start + timedelta(days=1)
+
+        # Query CalendarEvent table
+        events = self.db.query(CalendarEvent).filter(
+            CalendarEvent.start_time >= start,
+            CalendarEvent.start_time < end,
+            CalendarEvent.status != "cancelled"
+        ).order_by(CalendarEvent.start_time).all()
+
+        result = []
+        for event in events:
+            if event.all_day:
+                continue  # Skip all-day events for meeting context
+
+            duration_hours = (event.end_time - event.start_time).total_seconds() / 3600
+            result.append({
+                'title': event.summary or 'Meeting',
+                'time': event.start_time.strftime("%H:%M"),
+                'end_time': event.end_time.strftime("%H:%M"),
+                'duration_hours': round(duration_hours, 1),
+                'type': 'meeting',
+                'attendees': event.attendees_count
+            })
+
+        return result
+
+    def _get_meeting_density(self, date: str) -> Optional[Dict[str, Any]]:
+        """Get meeting density stats for a date."""
+        dp = self.db.query(DataPoint).filter(
+            DataPoint.date == date,
+            DataPoint.type == "meeting_density",
+            DataPoint.source == "calendar"
+        ).first()
+
+        if not dp:
+            return None
+
+        return {
+            'meeting_hours': dp.value,
+            'meeting_count': dp.extra_data.get('meeting_count', 0) if dp.extra_data else 0,
+            'total_minutes': dp.extra_data.get('total_minutes', 0) if dp.extra_data else 0
+        }
+
     def _get_day_context(self, date: str) -> DayContext:
         """Build full context for a single day."""
         # Get sleep
@@ -88,13 +137,8 @@ class InsightsService:
         ).order_by(JournalEntry.created_at.desc()).first()
         energy = energy_entry.energy if energy_entry else None
 
-        # Get calendar (placeholder - would come from calendar integration)
-        # For now, check if we have calendar data in metadata
-        calendar_dp = self.db.query(DataPoint).filter(
-            DataPoint.date == date,
-            DataPoint.type == "calendar"
-        ).first()
-        calendar_events = calendar_dp.extra_data.get('events', []) if calendar_dp else []
+        # Get calendar events from CalendarEvent table
+        calendar_events = self._get_calendar_events(date)
 
         return DayContext(
             date=date,
