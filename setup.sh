@@ -42,11 +42,23 @@ else
     info "Python $PYTHON_VERSION OK"
 fi
 
-# Create virtual environment (if not exists)
+# Check if venv module with ensurepip is available
+if ! python3 -c "import venv; import ensurepip" &> /dev/null; then
+    error "Python venv module not fully available. Install it with:
+    sudo apt install python3.${PYTHON_MINOR}-venv   # Debian/Ubuntu
+    # or: sudo dnf install python3-venv             # Fedora"
+fi
+
+# Create virtual environment (if not exists or broken)
 info "Setting up virtual environment..."
-if [ -d ".venv" ]; then
+if [ -d ".venv" ] && [ -f ".venv/bin/pip" ]; then
     info "Virtual environment already exists (.venv)"
 else
+    # Remove broken venv if it exists
+    if [ -d ".venv" ]; then
+        warn "Removing incomplete virtual environment..."
+        rm -rf .venv
+    fi
     python3 -m venv .venv
     info "Created virtual environment (.venv)"
 fi
