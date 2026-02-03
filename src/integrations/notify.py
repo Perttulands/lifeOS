@@ -9,7 +9,7 @@ import httpx
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class NotifyChannel(Enum):
@@ -158,7 +158,7 @@ class MobileBriefFormatter:
             "footer": {
                 "text": f"LifeOS • {date_display}"
             },
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         if confidence is not None:
