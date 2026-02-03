@@ -196,9 +196,16 @@ function showErrorState(hasError) {
             <p class="brief-text error-text">
                 Unable to connect to the API.
                 <a href="#" onclick="loadDashboardData(); return false;">Try again</a>
+                or <a href="#" onclick="enableDemoMode(); return false;">use demo mode</a>
             </p>
         `;
     }
+}
+
+function enableDemoMode() {
+    CONFIG.DEMO_MODE = true;
+    loadDemoData();
+    showToast('Demo mode enabled', 'info');
 }
 
 function formatTime(isoString) {
