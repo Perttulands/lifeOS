@@ -15,6 +15,7 @@ import {
     enableDemoMode
 } from './api.js';
 import { setupSettingsListeners } from './settings.js';
+import { checkOnboarding } from './onboarding.js';
 
 // === Initialization ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +29,9 @@ async function initializeApp() {
     setupEventListeners();
     setupSettingsListeners();
     await loadDashboardData();
+
+    // Check if first-run onboarding is needed
+    await checkOnboarding();
 }
 
 // === Event Listeners ===

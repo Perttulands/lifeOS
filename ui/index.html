@@ -467,6 +467,44 @@
 
         <!-- Toast Container -->
         <div class="toast-container" id="toastContainer"></div>
+
+        <!-- Onboarding Modal -->
+        <div class="modal-overlay onboarding-modal" id="onboardingModal">
+            <div class="modal glass-card onboarding-content">
+                <div class="onboarding-header">
+                    <div class="onboarding-logo">
+                        <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
+                            <circle cx="14" cy="14" r="12" stroke="url(#onboardingGradient)" stroke-width="2"/>
+                            <circle cx="14" cy="14" r="6" fill="url(#onboardingGradient)"/>
+                            <defs>
+                                <linearGradient id="onboardingGradient" x1="0" y1="0" x2="28" y2="28">
+                                    <stop offset="0%" stop-color="#818cf8"/>
+                                    <stop offset="100%" stop-color="#6366f1"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <h1 class="onboarding-title">Welcome to LifeOS</h1>
+                    <p class="onboarding-subtitle">Let's get you set up in a few quick steps</p>
+                </div>
+
+                <div class="onboarding-progress">
+                    <div class="onboarding-progress-bar">
+                        <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
+                    </div>
+                    <span class="onboarding-progress-text" id="onboardingProgressText">0% complete</span>
+                </div>
+
+                <div class="onboarding-steps" id="onboardingSteps">
+                    <!-- Steps will be populated by JS -->
+                </div>
+
+                <div class="onboarding-actions">
+                    <button class="btn btn-secondary" id="onboardingSkip">Skip for now</button>
+                    <button class="btn btn-primary" id="onboardingContinue">Continue</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="js/app.js"></script>
