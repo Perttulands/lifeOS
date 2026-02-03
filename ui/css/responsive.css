@@ -1,0 +1,260 @@
+/**
+ * LifeOS Dashboard - Responsive Styles
+ * All media queries for mobile/tablet/desktop
+ */
+
+/* Tablet (900px and below) */
+@media (max-width: 900px) {
+    .scores-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .score-card:last-child {
+        grid-column: span 2;
+    }
+}
+
+/* Mobile (640px and below) */
+@media (max-width: 640px) {
+    .app {
+        padding: var(--space-md);
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-sm);
+    }
+
+    .header-right {
+        text-align: left;
+    }
+
+    .scores-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .score-card:last-child {
+        grid-column: auto;
+    }
+
+    .trend-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Scrollable trend tabs */
+    .trend-tabs {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .trend-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .trend-tab {
+        flex-shrink: 0;
+        min-height: 44px;
+        padding: 10px 16px;
+    }
+
+    .trend-chart {
+        height: 160px;
+    }
+
+    .brief-card,
+    .trend-card,
+    .quicklog-card {
+        padding: var(--space-lg);
+    }
+
+    .value-main {
+        font-size: 2rem;
+    }
+
+    /* Touch targets (44px minimum) */
+    .refresh-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .energy-btn {
+        min-height: 72px;
+        padding: var(--space-sm);
+    }
+
+    .energy-emoji {
+        font-size: 1.25rem;
+    }
+
+    .log-submit {
+        min-height: 48px;
+    }
+
+    .toast-container {
+        left: var(--space-md);
+        right: var(--space-md);
+        bottom: var(--space-md);
+    }
+
+    .toast {
+        width: 100%;
+    }
+}
+
+/* Very small screens (400px and below) */
+@media (max-width: 400px) {
+    .app {
+        padding: var(--space-sm);
+    }
+
+    .brief-card,
+    .trend-card,
+    .quicklog-card,
+    .score-card {
+        padding: var(--space-md);
+    }
+
+    .value-main {
+        font-size: 1.75rem;
+    }
+
+    .brief-text {
+        font-size: 1rem;
+    }
+
+    .logo-text {
+        font-size: 1.25rem;
+    }
+
+    .greeting {
+        font-size: 1rem;
+    }
+
+    /* Energy buttons wrap */
+    .energy-selector {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .energy-btn {
+        flex: 0 0 calc(33.333% - var(--space-sm));
+        min-width: 60px;
+    }
+
+    /* Smaller tabs */
+    .trend-tab {
+        padding: 8px 12px;
+        font-size: 0.7rem;
+    }
+
+    .trend-title {
+        font-size: 0.875rem;
+    }
+
+    .section-title {
+        font-size: 0.875rem;
+    }
+
+    .quicklog-title {
+        font-size: 0.875rem;
+    }
+
+    .quicklog-hint {
+        font-size: 0.75rem;
+    }
+
+    /* Smaller insights */
+    .insight-card {
+        padding: var(--space-md);
+    }
+
+    .insight-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+
+    .insight-text {
+        font-size: 0.875rem;
+    }
+}
+
+/* Mobile settings (600px and below) */
+@media (max-width: 600px) {
+    .modal {
+        margin: var(--space-md);
+        max-height: calc(100vh - var(--space-xl));
+        max-height: calc(100dvh - var(--space-xl));
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: var(--space-md);
+    }
+
+    .time-range {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .time-separator {
+        text-align: center;
+        padding: var(--space-xs) 0;
+    }
+}
+
+/* Landscape orientation on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+    .app {
+        padding: var(--space-sm) var(--space-lg);
+    }
+
+    .header {
+        margin-bottom: var(--space-md);
+    }
+
+    .main {
+        gap: var(--space-md);
+    }
+
+    .brief-card,
+    .trend-card,
+    .quicklog-card,
+    .score-card {
+        padding: var(--space-md);
+    }
+
+    .brief-icon-wrapper {
+        width: 36px;
+        height: 36px;
+        font-size: 1.25rem;
+    }
+
+    .scores-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-md);
+    }
+
+    .score-card:last-child {
+        grid-column: auto;
+    }
+
+    .trend-chart {
+        height: 120px;
+    }
+
+    .value-main {
+        font-size: 1.75rem;
+    }
+
+    /* Hide ambient glow in landscape */
+    .ambient-glow {
+        display: none;
+    }
+}

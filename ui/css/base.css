@@ -1,0 +1,191 @@
+/**
+ * LifeOS Dashboard - Base Styles
+ * Reset, body, layout primitives
+ */
+
+/* Reset */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+/* App Container */
+.app {
+    position: relative;
+    min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-lg);
+}
+
+/* Ambient Background Glow */
+.ambient-glow {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 1400px;
+    height: 500px;
+    background: var(--gradient-ambient);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Glass Card Effect */
+.glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--glass-highlight), transparent);
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) 0;
+    margin-bottom: var(--space-xl);
+    position: relative;
+    z-index: 10;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.logo-icon {
+    display: flex;
+    filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+
+.logo-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-right {
+    text-align: right;
+}
+
+.greeting {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.date {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+/* Main Content */
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+    position: relative;
+    z-index: 1;
+}
+
+/* Dark Mode Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-faint);
+}
+
+/* Selection */
+::selection {
+    background: var(--accent-subtle);
+    color: var(--text-primary);
+}
+
+/* Focus States for Accessibility */
+:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Touch optimization */
+button, .energy-btn, .trend-tab, .log-submit, .refresh-btn {
+    touch-action: manipulation;
+}
+
+/* Error text */
+.error-text {
+    color: var(--error);
+}
+
+.error-text a {
+    color: var(--accent-light);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.error-text a:hover {
+    color: var(--accent-primary);
+}

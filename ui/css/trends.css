@@ -1,0 +1,147 @@
+/**
+ * LifeOS Dashboard - Trend Charts
+ * Trend section, chart, tooltips
+ */
+
+.trend-section {
+    animation: fadeInUp 0.6s ease-out 0.2s both;
+}
+
+.trend-card {
+    padding: var(--space-xl);
+}
+
+.trend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+    gap: var(--space-md);
+}
+
+.trend-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.trend-tabs {
+    display: flex;
+    gap: var(--space-xs);
+    background: var(--bg-tertiary);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+}
+
+.trend-tab {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.trend-tab:hover {
+    color: var(--text-secondary);
+}
+
+.trend-tab.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.trend-chart {
+    height: 180px;
+    position: relative;
+}
+
+.chart-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-skeleton {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--glass-bg) 50%, var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+.trend-legend {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-lg);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--glass-border);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* Chart Tooltip */
+.chart-tooltip {
+    position: absolute;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-100%);
+    transition: opacity 0.15s ease;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.chart-tooltip.visible {
+    opacity: 1;
+}
+
+.tooltip-date {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.tooltip-value {
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Empty State */
+.chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 160px;
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+    text-align: center;
+    padding: var(--space-lg);
+}

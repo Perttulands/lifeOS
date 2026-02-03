@@ -1,0 +1,204 @@
+/**
+ * LifeOS Dashboard - Score Cards
+ * Sleep, readiness, energy card components
+ */
+
+.scores-section {
+    animation: fadeInUp 0.6s ease-out 0.1s both;
+}
+
+.scores-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+}
+
+.score-card {
+    padding: var(--space-lg);
+    transition: all var(--transition-normal);
+    cursor: default;
+}
+
+.score-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-md);
+}
+
+.score-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.score-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sleep-icon {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.readiness-icon {
+    background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.energy-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.score-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.score-badge {
+    font-size: 0.625rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+}
+
+.score-body {
+    margin-bottom: var(--space-md);
+}
+
+.score-value {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.value-main {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.value-unit {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.score-quality {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.quality-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    position: relative;
+}
+
+.quality-bar::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: var(--quality-percent, 0%);
+    background: var(--quality-color, var(--accent-primary));
+    border-radius: var(--radius-full);
+    transition: width 1s ease-out;
+}
+
+.quality-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    min-width: 50px;
+    text-align: right;
+}
+
+.score-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.score-sparkline {
+    flex: 1;
+    height: 24px;
+}
+
+.score-sparkline svg {
+    width: 100%;
+    height: 100%;
+}
+
+.score-delta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.delta-indicator {
+    font-weight: 600;
+}
+
+.delta-indicator.positive {
+    color: var(--success);
+}
+
+.delta-indicator.negative {
+    color: var(--error);
+}
+
+/* Energy Display in Card */
+.energy-display {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.energy-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.energy-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    transition: all var(--transition-fast);
+}
+
+.energy-dot.active {
+    background: var(--gradient-warm);
+    box-shadow: 0 0 8px var(--warning-glow);
+}
+
+.energy-level {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}

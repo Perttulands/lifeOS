@@ -1,0 +1,19 @@
+/**
+ * LifeOS Dashboard - Style System
+ * ===============================
+ * A joyful, warm dark theme that's easy on the eyes
+ * and delightful to use every morning.
+ *
+ * This file imports all CSS partials.
+ */
+
+@import 'variables.css';
+@import 'base.css';
+@import 'brief.css';
+@import 'cards.css';
+@import 'trends.css';
+@import 'insights.css';
+@import 'quicklog.css';
+@import 'animations.css';
+@import 'modal.css';
+@import 'responsive.css';

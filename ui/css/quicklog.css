@@ -1,0 +1,159 @@
+/**
+ * LifeOS Dashboard - Quick Log
+ * Energy/mood logging form
+ */
+
+.quicklog-section {
+    animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+.quicklog-card {
+    padding: var(--space-xl);
+}
+
+.quicklog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--space-lg);
+}
+
+.quicklog-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.quicklog-hint {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.quicklog-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.energy-selector {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.energy-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-sm);
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.energy-btn:hover {
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    transform: translateY(-2px);
+}
+
+.energy-btn.selected {
+    background: var(--accent-subtle);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.energy-emoji {
+    font-size: 1.5rem;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+}
+
+.energy-btn:hover .energy-emoji,
+.energy-btn.selected .energy-emoji {
+    transform: scale(1.15);
+}
+
+.energy-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.energy-btn.selected .energy-label {
+    color: var(--accent-light);
+}
+
+.note-input-wrapper {
+    position: relative;
+}
+
+.note-input {
+    width: 100%;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    resize: none;
+    transition: all var(--transition-fast);
+}
+
+.note-input::placeholder {
+    color: var(--text-muted);
+}
+
+.note-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.log-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-md);
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.log-submit:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.log-submit:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.log-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.submit-icon {
+    display: flex;
+    transition: transform var(--transition-fast);
+}
+
+.log-submit:hover:not(:disabled) .submit-icon {
+    transform: translateX(4px);
+}
