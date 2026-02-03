@@ -19,6 +19,7 @@ const state = {
     currentMetric: 'sleep',
     sleepData: [],
     readinessData: [],
+    activityData: [],
     energyData: [],
     brief: null,
     insights: [],
@@ -101,10 +102,11 @@ async function loadDashboardData() {
 
     try {
         // Fetch all data in parallel
-        const [todayRes, sleepRes, readinessRes, patternsRes] = await Promise.all([
+        const [todayRes, sleepRes, readinessRes, activityRes, patternsRes] = await Promise.all([
             fetch(`${CONFIG.API_BASE}/today`),
             fetch(`${CONFIG.API_BASE}/data/sleep?limit=7`),
             fetch(`${CONFIG.API_BASE}/data/readiness?limit=7`),
+            fetch(`${CONFIG.API_BASE}/data/activity?limit=7`),
             fetch(`${CONFIG.API_BASE}/insights/patterns`),
         ]);
 
@@ -116,21 +118,31 @@ async function loadDashboardData() {
         const today = await todayRes.json();
         const sleepData = await sleepRes.json();
         const readinessData = await readinessRes.json();
+        const activityData = activityRes.ok ? await activityRes.json() : [];
         const patterns = patternsRes.ok ? await patternsRes.json() : [];
 
         // Transform sleep data for chart (reverse to chronological order)
+        // The value is the sleep score, metadata contains duration info
         state.sleepData = sleepData.reverse().map(d => ({
             date: d.date,
-            duration: d.value || 0,
-            quality: d.metadata?.score || 70,
-            deep: (d.metadata?.total_sleep_duration || 0) / 3600 * 0.2, // Approximate
-            rem: (d.metadata?.total_sleep_duration || 0) / 3600 * 0.25,
+            duration: (d.metadata?.total_sleep_duration || 0) / 3600, // Convert seconds to hours
+            quality: d.value || 0, // The score IS the value
+            deep: (d.metadata?.deep_sleep_duration || 0) / 100, // Contributor score
+            rem: (d.metadata?.rem_sleep_duration || 0) / 100,
         }));
 
         // Transform readiness data
         state.readinessData = readinessData.reverse().map(d => ({
             date: d.date,
             score: d.value || 0,
+        }));
+
+        // Transform activity data
+        state.activityData = activityData.reverse().map(d => ({
+            date: d.date,
+            score: d.value || 0,
+            steps: d.metadata?.steps || 0,
+            calories: d.metadata?.active_calories || 0,
         }));
 
         // Generate energy data (we'll use journal entries or empty)
@@ -504,31 +516,50 @@ function renderTrendChart() {
     const container = document.getElementById('trendChart');
     const legend = document.getElementById('trendLegend');
 
-    let data, color, label;
+    let data, color, label, sourceData, valueFormatter;
 
     switch (state.currentMetric) {
         case 'sleep':
-            data = (state.sleepData || []).map(d => d.duration);
+            sourceData = state.sleepData || [];
+            data = sourceData.map(d => d.duration);
             color = '#6366f1';
             label = 'Sleep (hours)';
+            valueFormatter = (val) => `${val.toFixed(1)}h`;
             break;
         case 'readiness':
-            data = (state.readinessData || []).map(d => d.score);
+            sourceData = state.readinessData || [];
+            data = sourceData.map(d => d.score);
             color = '#10b981';
             label = 'Readiness Score';
+            valueFormatter = (val) => Math.round(val);
+            break;
+        case 'activity':
+            sourceData = state.activityData || [];
+            data = sourceData.map(d => d.score);
+            color = '#f59e0b';
+            label = 'Activity Score';
+            valueFormatter = (val) => Math.round(val);
             break;
         case 'energy':
-            data = (state.energyData || []).map(d => d.level || 0);
-            color = '#f59e0b';
+            sourceData = state.energyData || [];
+            data = sourceData.map(d => d.level || 0);
+            color = '#f97316';
             label = 'Energy Level';
+            valueFormatter = (val) => Math.round(val);
             break;
+        default:
+            sourceData = state.sleepData || [];
+            data = sourceData.map(d => d.duration);
+            color = '#6366f1';
+            label = 'Sleep (hours)';
+            valueFormatter = (val) => `${val.toFixed(1)}h`;
     }
 
     // Handle empty data
-    if (!data || data.length === 0) {
+    if (!data || data.length === 0 || data.every(d => d === 0)) {
         container.innerHTML = `
             <div class="chart-empty">
-                <p>No data available yet. Sync your Oura data to see trends.</p>
+                <p>No ${state.currentMetric} data available yet. Sync your Oura data to see trends.</p>
             </div>
         `;
         legend.innerHTML = '';
@@ -537,18 +568,23 @@ function renderTrendChart() {
 
     const width = container.clientWidth || 600;
     const height = 160;
-    const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+    const padding = { top: 20, right: 20, bottom: 30, left: 45 };
 
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    const min = Math.min(...data) * 0.9;
-    const max = Math.max(...data) * 1.1;
+    // Filter out zero values for min/max calculation (if all zeros, use 1)
+    const nonZeroData = data.filter(d => d > 0);
+    const dataMin = nonZeroData.length > 0 ? Math.min(...nonZeroData) : 0;
+    const dataMax = nonZeroData.length > 0 ? Math.max(...nonZeroData) : 1;
+    const min = dataMin * 0.9;
+    const max = dataMax * 1.1;
     const range = max - min || 1;
 
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const dayLabels = state.sleepData.map(d => {
-        const date = new Date(d.date);
+    // Get day labels from the source data
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayLabels = sourceData.map(d => {
+        const date = new Date(d.date + 'T00:00:00'); // Ensure proper date parsing
         return days[date.getDay()];
     });
 
@@ -567,9 +603,7 @@ function renderTrendChart() {
     // Y-axis labels
     const yLabels = [min, (min + max) / 2, max].map(val => {
         const y = padding.top + chartHeight - ((val - min) / range) * chartHeight;
-        const formatted = state.currentMetric === 'sleep'
-            ? `${val.toFixed(1)}h`
-            : Math.round(val);
+        const formatted = valueFormatter(val);
         return `<text x="${padding.left - 8}" y="${y}" text-anchor="end" dominant-baseline="middle" class="chart-label">${formatted}</text>`;
     }).join('');
 
@@ -579,23 +613,39 @@ function renderTrendChart() {
         return `<text x="${x}" y="${height - 8}" text-anchor="middle" class="chart-label">${day}</text>`;
     }).join('');
 
-    // Dots
-    const dots = points.map((p, i) => `
-        <circle
-            cx="${p.x}"
-            cy="${p.y}"
-            r="4"
-            fill="${color}"
-            class="chart-dot"
-            style="animation-delay: ${i * 100}ms"
-        />
-    `).join('');
+    // Dots with hover areas
+    const dots = points.map((p, i) => {
+        const dateStr = sourceData[i]?.date || '';
+        const formattedValue = valueFormatter(p.val);
+        return `
+            <g class="chart-point" data-date="${dateStr}" data-value="${formattedValue}">
+                <circle
+                    cx="${p.x}"
+                    cy="${p.y}"
+                    r="12"
+                    fill="transparent"
+                    class="chart-dot-hover"
+                />
+                <circle
+                    cx="${p.x}"
+                    cy="${p.y}"
+                    r="4"
+                    fill="${color}"
+                    class="chart-dot"
+                    style="animation-delay: ${i * 100}ms"
+                />
+            </g>
+        `;
+    }).join('');
 
     container.innerHTML = `
+        <div class="chart-tooltip" id="chartTooltip"></div>
         <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}">
             <style>
                 .chart-label { font-size: 11px; fill: #64748b; font-family: 'JetBrains Mono', monospace; }
-                .chart-dot { opacity: 0; animation: fadeIn 0.3s ease forwards; }
+                .chart-dot { opacity: 0; animation: fadeIn 0.3s ease forwards; transition: r 0.15s ease; }
+                .chart-dot-hover { cursor: pointer; }
+                .chart-point:hover .chart-dot { r: 6; }
                 @keyframes fadeIn { to { opacity: 1; } }
             </style>
             <defs>
@@ -623,6 +673,9 @@ function renderTrendChart() {
         </svg>
     `;
 
+    // Add tooltip interactions
+    setupChartTooltips(container);
+
     // Legend
     legend.innerHTML = `
         <div class="legend-item">
@@ -630,6 +683,41 @@ function renderTrendChart() {
             <span>${label}</span>
         </div>
     `;
+}
+
+function setupChartTooltips(container) {
+    const tooltip = container.querySelector('#chartTooltip');
+    const points = container.querySelectorAll('.chart-point');
+
+    points.forEach(point => {
+        point.addEventListener('mouseenter', (e) => {
+            const date = point.dataset.date;
+            const value = point.dataset.value;
+            const formattedDate = formatChartDate(date);
+
+            tooltip.innerHTML = `
+                <div class="tooltip-date">${formattedDate}</div>
+                <div class="tooltip-value">${value}</div>
+            `;
+            tooltip.classList.add('visible');
+
+            // Position tooltip
+            const rect = point.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            tooltip.style.left = `${rect.left - containerRect.left + rect.width / 2}px`;
+            tooltip.style.top = `${rect.top - containerRect.top - 10}px`;
+        });
+
+        point.addEventListener('mouseleave', () => {
+            tooltip.classList.remove('visible');
+        });
+    });
+}
+
+function formatChartDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function renderInsights() {
