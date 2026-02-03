@@ -16,6 +16,7 @@ import {
 } from './api.js';
 import { setupSettingsListeners } from './settings.js';
 import { checkOnboarding } from './onboarding.js';
+import { initJournal } from './journal.js';
 
 // === Initialization ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +29,7 @@ async function initializeApp() {
 
     setupEventListeners();
     setupSettingsListeners();
+    initJournal();
     await loadDashboardData();
 
     // Check if first-run onboarding is needed

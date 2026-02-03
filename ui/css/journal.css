@@ -1,0 +1,595 @@
+/**
+ * LifeOS Dashboard - Mood/Energy Journal
+ * Beautiful, frictionless journaling UI
+ */
+
+.journal-section {
+    animation: fadeInUp 0.6s ease-out 0.5s both;
+}
+
+.journal-card {
+    padding: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ambient glow effect */
+.journal-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+        circle at 50% 50%,
+        rgba(99, 102, 241, 0.08) 0%,
+        transparent 50%
+    );
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-slow);
+}
+
+.journal-card:has(.journal-slider:active)::before,
+.journal-card:has(.mood-slider:active)::before {
+    opacity: 1;
+}
+
+.journal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-lg);
+}
+
+.journal-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.journal-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.journal-title-icon {
+    font-size: 1.25rem;
+}
+
+.journal-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.journal-time {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.journal-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+/* Slider Section */
+.journal-slider-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.slider-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.slider-label-icon {
+    font-size: 1rem;
+}
+
+.slider-value {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+
+.slider-value-num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    min-width: 2ch;
+    text-align: right;
+}
+
+.slider-value-max {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* Custom Range Slider */
+.slider-track {
+    position: relative;
+    height: 48px;
+    display: flex;
+    align-items: center;
+}
+
+.journal-slider,
+.mood-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    outline: none;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+}
+
+.journal-slider::-webkit-slider-thumb,
+.mood-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    box-shadow: 0 4px 16px var(--accent-glow);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    border: 3px solid var(--bg-primary);
+}
+
+.journal-slider::-webkit-slider-thumb:hover,
+.mood-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.journal-slider::-webkit-slider-thumb:active,
+.mood-slider::-webkit-slider-thumb:active {
+    transform: scale(1.2);
+    box-shadow: 0 8px 32px var(--accent-glow);
+}
+
+.journal-slider::-moz-range-thumb,
+.mood-slider::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    box-shadow: 0 4px 16px var(--accent-glow);
+    cursor: pointer;
+    border: 3px solid var(--bg-primary);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Slider fill effect */
+.slider-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 8px;
+    background: var(--gradient-primary);
+    border-radius: var(--radius-full);
+    pointer-events: none;
+    z-index: 1;
+    transition: width var(--transition-fast);
+}
+
+/* Slider markers */
+.slider-markers {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+    margin-top: var(--space-xs);
+}
+
+.slider-marker {
+    font-size: 0.625rem;
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    width: 16px;
+    text-align: center;
+}
+
+.slider-marker.active {
+    color: var(--accent-light);
+    font-weight: 600;
+}
+
+/* Emotion Labels */
+.emotion-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.emotion-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+    transition: all var(--transition-fast);
+}
+
+.emotion-label.active {
+    opacity: 1;
+    color: var(--accent-light);
+    font-weight: 500;
+}
+
+/* Mood Section */
+.mood-section {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--glass-border);
+}
+
+.mood-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    cursor: pointer;
+}
+
+.mood-toggle-checkbox {
+    display: none;
+}
+
+.mood-toggle-track {
+    width: 36px;
+    height: 20px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    position: relative;
+    transition: background var(--transition-fast);
+}
+
+.mood-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+}
+
+.mood-toggle-checkbox:checked + .mood-toggle-track {
+    background: var(--accent-primary);
+}
+
+.mood-toggle-checkbox:checked + .mood-toggle-track::after {
+    left: 18px;
+    background: white;
+}
+
+.mood-toggle-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.mood-slider-container {
+    display: none;
+    padding-top: var(--space-md);
+    animation: slideDown 0.3s ease-out;
+}
+
+.mood-slider-container.visible {
+    display: block;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Notes Section */
+.journal-notes-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.notes-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.journal-notes {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    resize: vertical;
+    transition: all var(--transition-fast);
+}
+
+.journal-notes::placeholder {
+    color: var(--text-muted);
+}
+
+.journal-notes:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+/* Tags Section */
+.journal-tags-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.tags-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.tag-btn {
+    padding: var(--space-xs) var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tag-btn:hover {
+    background: var(--glass-bg);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.tag-btn.selected {
+    background: var(--accent-subtle);
+    border-color: var(--accent-primary);
+    color: var(--accent-light);
+}
+
+.tag-btn .tag-emoji {
+    margin-right: 4px;
+}
+
+/* Submit Button */
+.journal-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 16px var(--accent-glow);
+    margin-top: var(--space-md);
+}
+
+.journal-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.journal-submit:active {
+    transform: translateY(0);
+}
+
+.journal-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.journal-submit-icon {
+    display: flex;
+    transition: transform var(--transition-fast);
+}
+
+.journal-submit:hover:not(:disabled) .journal-submit-icon {
+    transform: translateX(4px);
+}
+
+/* Success Animation */
+@keyframes journalSuccess {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(0.95);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.journal-card.success {
+    animation: journalSuccess 0.4s ease-out;
+}
+
+.journal-card.success::before {
+    opacity: 1;
+    background: radial-gradient(
+        circle at 50% 50%,
+        rgba(16, 185, 129, 0.15) 0%,
+        transparent 50%
+    );
+}
+
+/* Recent Entries Preview */
+.journal-recent {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--glass-border);
+}
+
+.journal-recent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.journal-recent-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.journal-recent-link {
+    font-size: 0.75rem;
+    color: var(--accent-light);
+    text-decoration: none;
+    transition: opacity var(--transition-fast);
+}
+
+.journal-recent-link:hover {
+    opacity: 0.8;
+}
+
+.journal-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.journal-recent-entry {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.journal-recent-entry:hover {
+    background: var(--glass-bg);
+}
+
+.journal-recent-time {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    min-width: 50px;
+}
+
+.journal-recent-values {
+    display: flex;
+    gap: var(--space-sm);
+    flex: 1;
+}
+
+.journal-recent-value {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8125rem;
+}
+
+.journal-recent-value .value-icon {
+    font-size: 0.875rem;
+}
+
+.journal-recent-value .value-num {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.journal-recent-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .journal-card {
+        padding: var(--space-lg);
+    }
+
+    .slider-value-num {
+        font-size: 1.25rem;
+    }
+
+    .journal-slider::-webkit-slider-thumb,
+    .mood-slider::-webkit-slider-thumb {
+        width: 32px;
+        height: 32px;
+    }
+
+    .tags-container {
+        gap: var(--space-xs);
+    }
+
+    .tag-btn {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: 0.75rem;
+    }
+
+    .journal-recent-note {
+        display: none;
+    }
+}
