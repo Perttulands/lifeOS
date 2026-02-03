@@ -15,6 +15,7 @@ Most self-management tools demand more than they give. LifeOS inverts this:
 ## Features
 
 - 🌅 **Daily Brief** - Morning AI summary based on sleep, calendar, energy
+- 📱 **Mobile Delivery** - Get briefs via Telegram/Discord at 7 AM
 - 💤 **Sleep Insights** - Patterns you'd never notice yourself
 - ⚡ **Energy Tracking** - Know when you do your best work
 - 📊 **Beautiful Dashboard** - Glanceable, joyful, useful
@@ -125,6 +126,9 @@ docker cp lifeos:/data/backup.db ./backup.db
 | `OURA_TOKEN` | Yes | - | Oura Personal Access Token |
 | `LITELLM_API_KEY` | Yes | - | LiteLLM/OpenAI API key |
 | `LITELLM_MODEL` | No | `gpt-4o-mini` | AI model to use |
+| `TELEGRAM_BOT_TOKEN` | No | - | Telegram Bot API token (from @BotFather) |
+| `TELEGRAM_CHAT_ID` | No | - | Your Telegram chat ID |
+| `DISCORD_WEBHOOK_URL` | No | - | Discord channel webhook URL |
 | `DATABASE_URL` | No | `sqlite:////data/lifeos.db` | Database connection |
 | `PORT` | No | `8080` | Server port |
 
