@@ -81,6 +81,30 @@ class EnergyPrediction(BaseModel):
     suggestion: str
 
 
+class MLEnergyPredictionResponse(BaseModel):
+    date: str
+    source: str
+    predicted_energy: float
+    confidence: float
+    features_used: Dict
+    model_version: str
+
+
+class MLModelTrainResponse(BaseModel):
+    success: bool
+    sample_count: int
+    r_squared: float
+    feature_importance: Dict[str, float]
+    message: str
+
+
+class PredictionComparisonResponse(BaseModel):
+    ml: Optional[Dict] = None
+    llm: Optional[Dict] = None
+    winner: Optional[str] = None
+    comparison: Optional[str] = None
+
+
 class GenerateRequest(BaseModel):
     insight_type: str
     date: Optional[str] = None
@@ -508,6 +532,236 @@ async def get_energy_prediction(
         low_hours=prediction.get('low_hours', []),
         suggestion=prediction.get('suggestion', '')
     )
+
+
+# === ML Energy Prediction Endpoints ===
+
+@app.post("/api/predictions/ml/train", response_model=MLModelTrainResponse)
+async def train_ml_energy_model(
+    days: int = Query(30, ge=7, le=365, description="Days of history to train on"),
+    db: Session = Depends(get_db)
+):
+    """
+    Train the ML energy prediction model.
+
+    Trains a linear regression model using sleep, readiness, and
+    historical energy data. Requires at least 7 days of data.
+    """
+    from .energy_predictor import get_energy_predictor
+
+    predictor = get_energy_predictor()
+
+    # Gather training data
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    # Get data points
+    data_points = db.query(DataPoint).filter(
+        DataPoint.date >= start_date,
+        DataPoint.date <= end_date
+    ).all()
+
+    # Get journal entries for energy
+    journal_entries = db.query(JournalEntry).filter(
+        JournalEntry.date >= start_date,
+        JournalEntry.date <= end_date
+    ).all()
+
+    # Convert to dicts
+    dp_dicts = [
+        {
+            "date": dp.date,
+            "type": dp.type,
+            "value": dp.value,
+            "metadata": dp.extra_data or {}
+        }
+        for dp in data_points
+    ]
+
+    je_dicts = [
+        {
+            "date": je.date,
+            "energy": je.energy
+        }
+        for je in journal_entries
+        if je.energy is not None
+    ]
+
+    # Prepare training data
+    training_data = predictor.prepare_training_data(dp_dicts, je_dicts)
+
+    if not training_data:
+        return MLModelTrainResponse(
+            success=False,
+            sample_count=0,
+            r_squared=0.0,
+            feature_importance={},
+            message="Insufficient data for training. Need at least 7 days with sleep, readiness, and energy logs."
+        )
+
+    # Train model
+    metrics = predictor.train(training_data)
+
+    return MLModelTrainResponse(
+        success=True,
+        sample_count=metrics["sample_count"],
+        r_squared=round(metrics["r_squared"], 3),
+        feature_importance={k: round(v, 3) for k, v in metrics["feature_importance"].items()},
+        message=f"Model trained successfully with R²={metrics['r_squared']:.3f}"
+    )
+
+
+@app.get("/api/predictions/ml/energy", response_model=Optional[MLEnergyPredictionResponse])
+async def get_ml_energy_prediction(
+    date: Optional[str] = Query(None, description="Date (YYYY-MM-DD), defaults to today"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get ML-based energy prediction for a date.
+
+    Requires model to be trained first via POST /api/predictions/ml/train.
+    Uses sleep, readiness, and day-of-week features.
+    """
+    from .energy_predictor import get_energy_predictor, get_prediction_comparator
+
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    predictor = get_energy_predictor()
+
+    if not predictor.is_trained:
+        raise HTTPException(
+            status_code=400,
+            detail="ML model not trained. Call POST /api/predictions/ml/train first."
+        )
+
+    # Get data points for target date
+    data_points = db.query(DataPoint).filter(
+        DataPoint.date == target_date
+    ).all()
+
+    dp_dicts = [
+        {
+            "date": dp.date,
+            "type": dp.type,
+            "value": dp.value,
+            "metadata": dp.extra_data or {}
+        }
+        for dp in data_points
+    ]
+
+    # Get previous day's energy
+    prev_date = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    prev_entry = db.query(JournalEntry).filter(
+        JournalEntry.date == prev_date,
+        JournalEntry.energy.isnot(None)
+    ).order_by(JournalEntry.created_at.desc()).first()
+
+    prev_energy = float(prev_entry.energy) * 2 if prev_entry else None  # Scale 1-5 to 1-10
+
+    prediction = predictor.predict_from_data(dp_dicts, target_date, prev_energy)
+
+    if not prediction:
+        return None
+
+    # Record prediction for comparison
+    comparator = get_prediction_comparator()
+    comparator.record_ml_prediction(prediction)
+
+    return MLEnergyPredictionResponse(
+        date=prediction.date,
+        source=prediction.source.value,
+        predicted_energy=prediction.predicted_energy,
+        confidence=prediction.confidence,
+        features_used=prediction.features_used,
+        model_version=prediction.model_version
+    )
+
+
+@app.get("/api/predictions/compare", response_model=PredictionComparisonResponse)
+async def compare_predictions(
+    db: Session = Depends(get_db)
+):
+    """
+    Compare ML vs LLM prediction accuracy.
+
+    Returns accuracy metrics (MAE, RMSE, correlation) for both models
+    based on historical predictions vs actual energy logs.
+    """
+    from .energy_predictor import get_prediction_comparator, PredictionSource
+
+    comparator = get_prediction_comparator()
+
+    # Load actuals from journal entries
+    entries = db.query(JournalEntry).filter(
+        JournalEntry.energy.isnot(None)
+    ).all()
+
+    for entry in entries:
+        entry_date = entry.date if isinstance(entry.date, str) else entry.date.isoformat()
+        comparator.record_actual(entry_date, float(entry.energy) * 2)  # Scale 1-5 to 1-10
+
+    result = comparator.compare_sources()
+
+    return PredictionComparisonResponse(
+        ml=result["ml"],
+        llm=result["llm"],
+        winner=result["winner"],
+        comparison=result["comparison"]
+    )
+
+
+@app.post("/api/predictions/record-llm")
+async def record_llm_prediction(
+    date: str = Query(..., description="Date of prediction (YYYY-MM-DD)"),
+    energy: float = Query(..., ge=1, le=10, description="Predicted energy (1-10)"),
+    confidence: float = Query(0.5, ge=0, le=1, description="Confidence (0-1)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Record an LLM energy prediction for comparison tracking.
+
+    Call this after getting an LLM prediction to track accuracy.
+    """
+    from .energy_predictor import get_prediction_comparator
+
+    comparator = get_prediction_comparator()
+    comparator.record_llm_prediction(date, energy, confidence)
+
+    return {
+        "success": True,
+        "recorded": {
+            "date": date,
+            "predicted_energy": energy,
+            "confidence": confidence
+        }
+    }
+
+
+@app.get("/api/predictions/ml/status")
+async def ml_model_status():
+    """
+    Get ML model training status.
+
+    Returns whether the model is trained and training metrics.
+    """
+    from .energy_predictor import get_energy_predictor
+
+    predictor = get_energy_predictor()
+
+    if not predictor.is_trained:
+        return {
+            "trained": False,
+            "message": "Model not trained. Call POST /api/predictions/ml/train"
+        }
+
+    params = predictor.get_model_params()
+
+    return {
+        "trained": True,
+        "version": params["version"],
+        "r_squared": params["r_squared"],
+        "sample_count": params["sample_count"],
+        "features": params["feature_names"]
+    }
 
 
 @app.get("/api/insights/weekly", response_model=Optional[InsightResponse])
