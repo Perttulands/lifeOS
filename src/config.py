@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # Notifications - Discord
     discord_webhook_url: str = Field(default="", alias="DISCORD_WEBHOOK_URL")
 
+    # Notifications - Quiet Hours
+    # Default: 23:00-08:00 (no notifications during sleep)
+    user_timezone: str = Field(default="UTC", alias="USER_TIMEZONE")
+    quiet_hours_start: str = Field(default="23:00", alias="QUIET_HOURS_START")
+    quiet_hours_end: str = Field(default="08:00", alias="QUIET_HOURS_END")
+    quiet_hours_enabled: bool = Field(default=True, alias="QUIET_HOURS_ENABLED")
+
     # Database
     database_url: str = Field(
         default="sqlite:///./lifeos.db",

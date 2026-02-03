@@ -3,13 +3,19 @@ LifeOS Notification Service
 
 Send messages via Telegram and Discord for morning briefs and alerts.
 Integrates with Clawdbot or directly with platform APIs.
+Supports quiet hours to avoid notifications during sleep.
 """
 
 import httpx
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, List
-from datetime import datetime, timezone, timedelta
+from typing import Optional, List, Tuple
+from datetime import datetime, timezone, timedelta, time
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 
 class NotifyChannel(Enum):
@@ -25,6 +31,138 @@ class NotifyResult:
     channel: NotifyChannel
     message_id: Optional[str] = None
     error: Optional[str] = None
+    blocked_by_quiet_hours: bool = False
+
+
+class QuietHoursChecker:
+    """
+    Check if current time is within quiet hours (no notifications).
+
+    Respects user timezone and handles overnight quiet periods
+    (e.g., 23:00-08:00 crossing midnight).
+    """
+
+    def __init__(
+        self,
+        start_time: str = "23:00",
+        end_time: str = "08:00",
+        timezone_name: str = "UTC",
+        enabled: bool = True
+    ):
+        """
+        Initialize quiet hours checker.
+
+        Args:
+            start_time: Start of quiet hours (HH:MM format, 24h)
+            end_time: End of quiet hours (HH:MM format, 24h)
+            timezone_name: IANA timezone name (e.g., "Europe/Helsinki")
+            enabled: Whether quiet hours checking is enabled
+        """
+        self.enabled = enabled
+        self.timezone_name = timezone_name
+
+        # Parse times
+        self.start_hour, self.start_minute = self._parse_time(start_time)
+        self.end_hour, self.end_minute = self._parse_time(end_time)
+
+        # Get timezone
+        try:
+            self.tz = ZoneInfo(timezone_name)
+        except Exception:
+            self.tz = timezone.utc
+
+    @staticmethod
+    def _parse_time(time_str: str) -> Tuple[int, int]:
+        """Parse HH:MM string into hour and minute."""
+        try:
+            parts = time_str.split(":")
+            return int(parts[0]), int(parts[1])
+        except (ValueError, IndexError):
+            return 0, 0
+
+    def _time_to_minutes(self, hour: int, minute: int) -> int:
+        """Convert hour:minute to minutes since midnight."""
+        return hour * 60 + minute
+
+    def is_quiet_time(self, check_time: Optional[datetime] = None) -> bool:
+        """
+        Check if the given time (or now) is within quiet hours.
+
+        Args:
+            check_time: Time to check (defaults to now in user timezone)
+
+        Returns:
+            True if notifications should be suppressed
+        """
+        if not self.enabled:
+            return False
+
+        # Get current time in user's timezone
+        if check_time is None:
+            check_time = datetime.now(self.tz)
+        elif check_time.tzinfo is None:
+            check_time = check_time.replace(tzinfo=self.tz)
+        else:
+            check_time = check_time.astimezone(self.tz)
+
+        current_minutes = self._time_to_minutes(check_time.hour, check_time.minute)
+        start_minutes = self._time_to_minutes(self.start_hour, self.start_minute)
+        end_minutes = self._time_to_minutes(self.end_hour, self.end_minute)
+
+        # Handle overnight quiet period (e.g., 23:00 - 08:00)
+        if start_minutes > end_minutes:
+            # Quiet period crosses midnight
+            return current_minutes >= start_minutes or current_minutes < end_minutes
+        else:
+            # Normal period (e.g., 13:00 - 14:00)
+            return start_minutes <= current_minutes < end_minutes
+
+    def time_until_quiet_ends(self, check_time: Optional[datetime] = None) -> Optional[timedelta]:
+        """
+        Get time remaining until quiet hours end.
+
+        Returns:
+            timedelta until quiet hours end, or None if not in quiet hours
+        """
+        if not self.is_quiet_time(check_time):
+            return None
+
+        if check_time is None:
+            check_time = datetime.now(self.tz)
+        elif check_time.tzinfo is None:
+            check_time = check_time.replace(tzinfo=self.tz)
+        else:
+            check_time = check_time.astimezone(self.tz)
+
+        # Calculate end time today or tomorrow
+        end_today = check_time.replace(
+            hour=self.end_hour,
+            minute=self.end_minute,
+            second=0,
+            microsecond=0
+        )
+
+        if end_today <= check_time:
+            # End time is tomorrow
+            end_today += timedelta(days=1)
+
+        return end_today - check_time
+
+    def get_status(self) -> dict:
+        """Get current quiet hours status."""
+        now = datetime.now(self.tz)
+        is_quiet = self.is_quiet_time(now)
+        time_remaining = self.time_until_quiet_ends(now)
+
+        return {
+            "enabled": self.enabled,
+            "is_quiet_time": is_quiet,
+            "current_time": now.strftime("%H:%M"),
+            "timezone": self.timezone_name,
+            "quiet_start": f"{self.start_hour:02d}:{self.start_minute:02d}",
+            "quiet_end": f"{self.end_hour:02d}:{self.end_minute:02d}",
+            "minutes_until_end": int(time_remaining.total_seconds() / 60) if time_remaining else None
+        }
 
 
 class MobileFormatter:
@@ -326,7 +464,8 @@ class NotificationService:
     Supports:
     - Direct Telegram Bot API
     - Direct Discord Webhooks
-    - Clawdbot proxy (future)
+    - Quiet hours (no notifications during sleep)
+    - User timezone support
     """
 
     def __init__(
@@ -334,7 +473,11 @@ class NotificationService:
         telegram_bot_token: Optional[str] = None,
         telegram_chat_id: Optional[str] = None,
         discord_webhook_url: Optional[str] = None,
-        timeout: float = 10.0
+        timeout: float = 10.0,
+        quiet_hours_start: str = "23:00",
+        quiet_hours_end: str = "08:00",
+        user_timezone: str = "UTC",
+        quiet_hours_enabled: bool = True
     ):
         """
         Initialize the notification service.
@@ -344,12 +487,24 @@ class NotificationService:
             telegram_chat_id: Default Telegram chat ID to send to
             discord_webhook_url: Discord webhook URL
             timeout: HTTP request timeout in seconds
+            quiet_hours_start: Start of quiet period (HH:MM)
+            quiet_hours_end: End of quiet period (HH:MM)
+            user_timezone: User's timezone (IANA format)
+            quiet_hours_enabled: Whether to enforce quiet hours
         """
         self.telegram_bot_token = telegram_bot_token
         self.telegram_chat_id = telegram_chat_id
         self.discord_webhook_url = discord_webhook_url
         self.timeout = timeout
         self.formatter = MobileBriefFormatter()
+
+        # Initialize quiet hours checker
+        self.quiet_hours = QuietHoursChecker(
+            start_time=quiet_hours_start,
+            end_time=quiet_hours_end,
+            timezone_name=user_timezone,
+            enabled=quiet_hours_enabled
+        )
 
     @property
     def telegram_enabled(self) -> bool:
@@ -370,6 +525,35 @@ class NotificationService:
         if self.discord_enabled:
             channels.append(NotifyChannel.DISCORD)
         return channels
+
+    def is_quiet_time(self) -> bool:
+        """Check if current time is within quiet hours."""
+        return self.quiet_hours.is_quiet_time()
+
+    def get_quiet_hours_status(self) -> dict:
+        """Get current quiet hours status."""
+        return self.quiet_hours.get_status()
+
+    def _check_quiet_hours(self, bypass: bool = False) -> Optional[NotifyResult]:
+        """
+        Check if notifications are blocked by quiet hours.
+
+        Args:
+            bypass: If True, skip quiet hours check
+
+        Returns:
+            NotifyResult with blocked_by_quiet_hours=True if blocked, None otherwise
+        """
+        if not bypass and self.quiet_hours.is_quiet_time():
+            status = self.quiet_hours.get_status()
+            return NotifyResult(
+                success=False,
+                channel=NotifyChannel.TELEGRAM,  # placeholder
+                error=f"Quiet hours active ({status['quiet_start']}-{status['quiet_end']} {status['timezone']}). "
+                      f"Notifications resume in {status['minutes_until_end']} minutes.",
+                blocked_by_quiet_hours=True
+            )
+        return None
 
     async def send_telegram(
         self,
@@ -518,10 +702,13 @@ class NotificationService:
         sleep_hours: Optional[float] = None,
         readiness_score: Optional[int] = None,
         confidence: Optional[float] = None,
-        channels: Optional[List[NotifyChannel]] = None
+        channels: Optional[List[NotifyChannel]] = None,
+        bypass_quiet_hours: bool = False
     ) -> List[NotifyResult]:
         """
         Send a formatted daily brief to all configured channels.
+
+        Respects quiet hours unless bypass_quiet_hours=True.
 
         Args:
             content: The brief content from AI
@@ -530,10 +717,26 @@ class NotificationService:
             readiness_score: Optional readiness score for display
             confidence: AI confidence score
             channels: Specific channels to use (defaults to all enabled)
+            bypass_quiet_hours: Skip quiet hours check (for urgent messages)
 
         Returns:
             List of NotifyResult for each channel attempted
         """
+        # Check quiet hours
+        quiet_check = self._check_quiet_hours(bypass=bypass_quiet_hours)
+        if quiet_check:
+            # Return blocked result for each requested channel
+            target_channels = channels or self.enabled_channels
+            return [
+                NotifyResult(
+                    success=False,
+                    channel=ch,
+                    error=quiet_check.error,
+                    blocked_by_quiet_hours=True
+                )
+                for ch in target_channels
+            ]
+
         target_channels = channels or self.enabled_channels
         results = []
 
@@ -569,7 +772,8 @@ class NotificationService:
         sleep_hours: Optional[float] = None,
         readiness_score: Optional[int] = None,
         confidence: Optional[float] = None,
-        channels: Optional[List[NotifyChannel]] = None
+        channels: Optional[List[NotifyChannel]] = None,
+        bypass_quiet_hours: bool = False
     ) -> List[NotifyResult]:
         """
         Synchronous wrapper for send_brief.
@@ -591,7 +795,8 @@ class NotificationService:
                 sleep_hours=sleep_hours,
                 readiness_score=readiness_score,
                 confidence=confidence,
-                channels=channels
+                channels=channels,
+                bypass_quiet_hours=bypass_quiet_hours
             )
         )
 
@@ -603,10 +808,13 @@ class NotificationService:
         avg_readiness: Optional[int] = None,
         patterns: Optional[List[dict]] = None,
         confidence: Optional[float] = None,
-        channels: Optional[List[NotifyChannel]] = None
+        channels: Optional[List[NotifyChannel]] = None,
+        bypass_quiet_hours: bool = False
     ) -> List[NotifyResult]:
         """
         Send a formatted weekly review to all configured channels.
+
+        Respects quiet hours unless bypass_quiet_hours=True.
 
         Args:
             content: The review content from AI
@@ -614,12 +822,27 @@ class NotificationService:
             avg_sleep_hours: Average sleep duration for the week
             avg_readiness: Average readiness score for the week
             patterns: List of detected patterns
+            bypass_quiet_hours: Skip quiet hours check
             confidence: AI confidence score
             channels: Specific channels to use (defaults to all enabled)
 
         Returns:
             List of NotifyResult for each channel attempted
         """
+        # Check quiet hours
+        quiet_check = self._check_quiet_hours(bypass=bypass_quiet_hours)
+        if quiet_check:
+            target_channels = channels or self.enabled_channels
+            return [
+                NotifyResult(
+                    success=False,
+                    channel=ch,
+                    error=quiet_check.error,
+                    blocked_by_quiet_hours=True
+                )
+                for ch in target_channels
+            ]
+
         target_channels = channels or self.enabled_channels
         results = []
 
@@ -658,7 +881,8 @@ class NotificationService:
         avg_readiness: Optional[int] = None,
         patterns: Optional[List[dict]] = None,
         confidence: Optional[float] = None,
-        channels: Optional[List[NotifyChannel]] = None
+        channels: Optional[List[NotifyChannel]] = None,
+        bypass_quiet_hours: bool = False
     ) -> List[NotifyResult]:
         """
         Synchronous wrapper for send_weekly_review.
@@ -681,7 +905,8 @@ class NotificationService:
                 avg_readiness=avg_readiness,
                 patterns=patterns,
                 confidence=confidence,
-                channels=channels
+                channels=channels,
+                bypass_quiet_hours=bypass_quiet_hours
             )
         )
 
@@ -695,5 +920,9 @@ def get_notification_service() -> NotificationService:
     return NotificationService(
         telegram_bot_token=settings.telegram_bot_token,
         telegram_chat_id=settings.telegram_chat_id,
-        discord_webhook_url=settings.discord_webhook_url
+        discord_webhook_url=settings.discord_webhook_url,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
+        user_timezone=settings.user_timezone,
+        quiet_hours_enabled=settings.quiet_hours_enabled
     )
