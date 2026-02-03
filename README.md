@@ -132,12 +132,56 @@ docker cp lifeos:/data/backup.db ./backup.db
 | `DATABASE_URL` | No | `sqlite:////data/lifeos.db` | Database connection |
 | `PORT` | No | `8080` | Server port |
 
+## Morning Brief Delivery
+
+Get your daily brief delivered to Telegram or Discord at 7 AM.
+
+### Setup
+
+1. **Telegram**: Create a bot via @BotFather, get the token. Message the bot, then get your chat ID from `https://api.telegram.org/bot<TOKEN>/getUpdates`
+
+2. **Discord**: In your server, go to Channel Settings > Integrations > Webhooks > New Webhook
+
+3. Add to your `.env`:
+```bash
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+TELEGRAM_CHAT_ID=123456789
+# or
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+### Cron Job
+
+```bash
+# Daily brief at 7 AM
+0 7 * * * cd /path/to/lifeOS && source .venv/bin/activate && python -m src.jobs.daily_brief --notify
+```
+
+### Manual Trigger
+
+```bash
+# Generate and send
+python -m src.jobs.daily_brief --notify
+
+# Re-send existing brief
+python -m src.jobs.daily_brief --notify-only
+
+# Force regenerate and send
+python -m src.jobs.daily_brief --force --notify
+```
+
+Or via API:
+```bash
+curl -X POST http://localhost:8080/api/brief/deliver
+```
+
 ## Stack
 
 - **Backend:** Python + FastAPI
 - **Database:** SQLite (your data stays yours)
 - **AI:** LiteLLM (flexible model routing)
 - **Frontend:** Vanilla HTML/CSS/JS
+- **Notifications:** Telegram/Discord via Bot API/Webhooks
 
 ## Configuration
 
