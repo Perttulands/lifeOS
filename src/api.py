@@ -19,6 +19,7 @@ from .database import get_db, init_db
 from .models import DataPoint, Insight, Pattern, JournalEntry, Task, Note
 from .insights_service import InsightsService
 from .integrations.capture import CaptureService, process_webhook, CaptureType
+from .integrations.oura import OuraSyncService, sync_oura_data
 
 
 # === Pydantic Models ===
@@ -132,6 +133,24 @@ class NoteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class OuraSyncRequest(BaseModel):
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+class OuraSyncResultResponse(BaseModel):
+    success: bool
+    data_type: str
+    records_synced: int
+    date_range: List[str]
+    errors: List[str]
+
+
+class OuraSyncResponse(BaseModel):
+    results: List[OuraSyncResultResponse]
+    total_synced: int
 
 
 # === FastAPI App ===
@@ -468,6 +487,90 @@ async def get_activity_data(
         )
         for d in data
     ]
+
+
+# === Oura Sync Endpoints ===
+
+@app.post("/api/oura/sync", response_model=OuraSyncResponse)
+async def sync_oura(
+    request: OuraSyncRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Sync Oura data for a date range.
+
+    If no dates provided, syncs today's data.
+    Fetches sleep, activity, and readiness data.
+    """
+    results = sync_oura_data(
+        db=db,
+        start_date=request.start_date,
+        end_date=request.end_date
+    )
+
+    total = sum(r.records_synced for r in results)
+
+    return OuraSyncResponse(
+        results=[
+            OuraSyncResultResponse(
+                success=r.success,
+                data_type=r.data_type.value,
+                records_synced=r.records_synced,
+                date_range=list(r.date_range),
+                errors=r.errors
+            )
+            for r in results
+        ],
+        total_synced=total
+    )
+
+
+@app.post("/api/oura/backfill", response_model=OuraSyncResponse)
+async def backfill_oura(
+    days: int = Query(30, ge=1, le=365, description="Days of history to backfill"),
+    db: Session = Depends(get_db)
+):
+    """
+    Backfill historical Oura data.
+
+    Fetches the last N days of sleep, activity, and readiness data.
+    Use on first setup to populate historical data.
+    """
+    service = OuraSyncService(db)
+    results = service.backfill(days=days)
+
+    total = sum(r.records_synced for r in results)
+
+    return OuraSyncResponse(
+        results=[
+            OuraSyncResultResponse(
+                success=r.success,
+                data_type=r.data_type.value,
+                records_synced=r.records_synced,
+                date_range=list(r.date_range),
+                errors=r.errors
+            )
+            for r in results
+        ],
+        total_synced=total
+    )
+
+
+@app.get("/api/oura/status")
+async def oura_status():
+    """
+    Check Oura integration status.
+
+    Returns whether the Oura token is configured.
+    """
+    from .config import settings
+
+    has_token = bool(settings.oura_token)
+
+    return {
+        "configured": has_token,
+        "base_url": settings.oura_base_url
+    }
 
 
 # === Quick Capture ===
