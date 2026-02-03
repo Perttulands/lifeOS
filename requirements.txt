@@ -1,0 +1,23 @@
+# LifeOS - Dependencies
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Database
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# AI - LiteLLM for model routing
+litellm>=1.20.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Date handling
+python-dateutil>=2.8.0
