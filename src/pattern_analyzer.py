@@ -7,12 +7,16 @@ Real statistical analysis for pattern detection:
 - Day-of-week pattern analysis
 - Statistical significance testing
 """
+from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 from collections import defaultdict
 import math
+
+if TYPE_CHECKING:
+    import numpy as np
 
 try:
     import numpy as np
@@ -21,8 +25,7 @@ try:
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
-    # Fallback implementations for basic stats
-    np = None
+    np = None  # type: ignore
 
 
 @dataclass
@@ -252,8 +255,8 @@ class PatternAnalyzer:
 
     def _calculate_correlation(
         self,
-        x: np.ndarray,
-        y: np.ndarray
+        x: "np.ndarray",
+        y: "np.ndarray"
     ) -> Optional[CorrelationResult]:
         """Calculate Pearson correlation with p-value."""
         # Remove NaN pairs
@@ -363,7 +366,7 @@ class PatternAnalyzer:
 
     def _calculate_trend(
         self,
-        values: np.ndarray,
+        values: "np.ndarray",
         dates: List[str]
     ) -> Optional[TrendResult]:
         """Calculate linear trend with significance testing."""
