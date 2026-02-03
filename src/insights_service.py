@@ -353,6 +353,15 @@ class InsightsService:
 
         prediction = self.ai.predict_energy(today, history)
 
+        # Record LLM prediction for comparison tracking
+        try:
+            from .energy_predictor import get_prediction_comparator
+            comparator = get_prediction_comparator()
+            overall = prediction.get('overall', 5)
+            comparator.record_llm_prediction(date, float(overall), 0.7)
+        except ImportError:
+            pass  # energy_predictor not available
+
         # Store as insight
         insight = Insight(
             type="energy_prediction",
