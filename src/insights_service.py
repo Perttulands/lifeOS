@@ -15,14 +15,25 @@ from .ai import (
     LifeOSAI, get_ai,
     SleepData, DayContext, InsightResult, PatternResult
 )
+from .pattern_analyzer import PatternAnalyzer, get_analyzer, DetectedPattern
 
 
 class InsightsService:
     """Service for managing LifeOS insights."""
 
-    def __init__(self, db: Session, ai: Optional[LifeOSAI] = None):
+    def __init__(
+        self,
+        db: Session,
+        ai: Optional[LifeOSAI] = None,
+        analyzer: Optional[PatternAnalyzer] = None
+    ):
         self.db = db
         self.ai = ai or get_ai()
+        try:
+            self.analyzer = analyzer or get_analyzer()
+        except ImportError:
+            # scipy not installed, statistical analysis disabled
+            self.analyzer = None
 
     # === DATA HELPERS ===
 
@@ -183,13 +194,21 @@ class InsightsService:
             Insight.type == "daily_brief"
         ).first()
 
-    def detect_patterns(self, days: int = 30, force: bool = False) -> List[Pattern]:
+    def detect_patterns(
+        self,
+        days: int = 30,
+        force: bool = False,
+        use_statistical: bool = True,
+        use_llm: bool = False
+    ) -> List[Pattern]:
         """
-        Detect patterns and store them.
+        Detect patterns using statistical analysis and optionally LLM.
 
         Args:
             days: Days of history to analyze
             force: Whether to detect even if recent patterns exist
+            use_statistical: Use statistical correlation/trend analysis
+            use_llm: Also use LLM for additional pattern discovery
 
         Returns:
             List of Pattern objects
@@ -210,15 +229,39 @@ class InsightsService:
         if len(data_points) < 7:
             return []
 
-        # Run pattern detection
-        results = self.ai.analyze_patterns(data_points, days)
+        all_results = []
+
+        # Run statistical pattern detection (primary method)
+        if use_statistical and self.analyzer:
+            stat_patterns = self._run_statistical_analysis(data_points)
+            all_results.extend(stat_patterns)
+
+        # Optionally run LLM pattern detection
+        if use_llm:
+            llm_results = self.ai.analyze_patterns(data_points, days)
+            # Convert LLM results to same format
+            for r in llm_results:
+                all_results.append(DetectedPattern(
+                    name=r.name,
+                    description=r.description,
+                    pattern_type=r.pattern_type,
+                    variables=r.variables,
+                    strength=r.strength,
+                    confidence=r.confidence,
+                    sample_size=r.sample_size,
+                    actionable=r.actionable,
+                    details={'source': 'llm'}
+                ))
+
+        # Deduplicate patterns (similar names/variables)
+        unique_results = self._deduplicate_patterns(all_results)
 
         # Deactivate old patterns
         self.db.query(Pattern).update({Pattern.active: False})
 
         # Store new patterns
         patterns = []
-        for r in results:
+        for r in unique_results:
             pattern = Pattern(
                 name=r.name,
                 description=r.description,
@@ -235,6 +278,45 @@ class InsightsService:
 
         self.db.commit()
         return patterns
+
+    def _run_statistical_analysis(
+        self,
+        data_points: List[Dict[str, Any]]
+    ) -> List[DetectedPattern]:
+        """Run statistical pattern analysis."""
+        if not self.analyzer:
+            return []
+
+        try:
+            # Run all statistical analyses
+            patterns = self.analyzer.analyze_all(data_points)
+
+            # Also run sliding window analysis
+            organized = self.analyzer._organize_data(data_points)
+            window_patterns = self.analyzer.analyze_sliding_window(organized)
+            patterns.extend(window_patterns)
+
+            return patterns
+        except Exception as e:
+            # Log error but don't fail
+            print(f"Statistical analysis error: {e}")
+            return []
+
+    def _deduplicate_patterns(
+        self,
+        patterns: List[DetectedPattern]
+    ) -> List[DetectedPattern]:
+        """Remove duplicate patterns, keeping highest confidence."""
+        seen = {}
+
+        for p in patterns:
+            # Create a key based on pattern type and variables
+            key = (p.pattern_type, tuple(sorted(p.variables)))
+
+            if key not in seen or p.confidence > seen[key].confidence:
+                seen[key] = p
+
+        return list(seen.values())
 
     def get_patterns(self, active_only: bool = True) -> List[Pattern]:
         """Get stored patterns."""
