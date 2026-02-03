@@ -256,44 +256,77 @@ export function updateSubmitState() {
 
 // === Demo Data Generation ===
 
+// Realistic curated sleep data with a narrative
 function generateSleepData(days) {
+    // Curated data that tells a story: recovery from poor sleep mid-week
+    const curatedDurations = [7.2, 6.8, 5.5, 6.1, 7.4, 7.8, 7.1];
+    const curatedQualities = [82, 78, 58, 65, 85, 89, 84];
+
     const data = [];
     for (let i = days - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        const idx = days - 1 - i;
         data.push({
             date: date.toISOString().split('T')[0],
-            duration: 5.5 + Math.random() * 2.5,
-            quality: 60 + Math.random() * 35,
-            deep: 0.8 + Math.random() * 0.8,
-            rem: 1.0 + Math.random() * 1.0,
+            duration: curatedDurations[idx] || 7.0,
+            quality: curatedQualities[idx] || 75,
+            deep: 0.9 + (curatedQualities[idx] / 100) * 0.6,
+            rem: 1.0 + (curatedQualities[idx] / 100) * 0.8,
         });
     }
     return data;
 }
 
+// Realistic readiness data that correlates with sleep
 function generateReadinessData(days) {
+    const curatedScores = [78, 74, 52, 61, 82, 88, 85];
+
     const data = [];
     for (let i = days - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        const idx = days - 1 - i;
         data.push({
             date: date.toISOString().split('T')[0],
-            score: 55 + Math.random() * 40,
+            score: curatedScores[idx] || 75,
         });
     }
     return data;
 }
 
-function generateEnergyData(days) {
+// Activity data with realistic patterns
+function generateActivityData(days) {
+    const curatedScores = [72, 85, 45, 68, 78, 92, 74];
+    const curatedSteps = [8500, 12400, 3200, 7800, 9200, 15600, 8900];
+
     const data = [];
     for (let i = days - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        const hasData = Math.random() > 0.2;
+        const idx = days - 1 - i;
         data.push({
             date: date.toISOString().split('T')[0],
-            level: hasData ? Math.ceil(Math.random() * 5) : null,
+            score: curatedScores[idx] || 70,
+            steps: curatedSteps[idx] || 8000,
+            calories: Math.round(curatedSteps[idx] * 0.05) || 400,
+        });
+    }
+    return data;
+}
+
+// Energy self-reports that tell a user story
+function generateEnergyData(days) {
+    const curatedLevels = [4, 4, 2, 3, 4, 5, 4];
+
+    const data = [];
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const idx = days - 1 - i;
+        data.push({
+            date: date.toISOString().split('T')[0],
+            level: curatedLevels[idx],
         });
     }
     return data;
@@ -302,31 +335,59 @@ function generateEnergyData(days) {
 export function loadDemoData() {
     state.sleepData = generateSleepData(7);
     state.readinessData = generateReadinessData(7);
+    state.activityData = generateActivityData(7);
     state.energyData = generateEnergyData(7);
 
+    // Compelling brief that showcases the product value
     state.brief = {
-        text: `You got <strong>6 hours 42 minutes</strong> of sleep last night — that's <span class="brief-highlight">48 minutes below</span> your weekly average. Your deep sleep was solid at 1h 23m, but REM was a bit low. Consider an earlier bedtime tonight to catch up. Your readiness score of <strong>72</strong> suggests you're good for focused work this morning, but maybe skip that intense workout.`,
+        text: `<strong>Good news:</strong> You bounced back well from that rough Wednesday. Last night's <strong>7h 6m of sleep</strong> (84% quality) puts you <span class="brief-highlight">+18 minutes above</span> your weekly average.
+
+Your <strong>readiness score of 85</strong> suggests today is ideal for deep work or that challenging workout you've been putting off.
+
+<em>One pattern I've noticed:</em> Your energy dips on days after less than 6 hours of sleep. Tonight's goal: lights out by 11 PM to keep this momentum going.`,
         generatedAt: '7:00 AM',
-        tags: ['sleep-debt', 'low-rem', 'readiness-good'],
+        tags: ['recovery', 'high-readiness', 'deep-work-day'],
     };
 
+    // Insights that feel genuinely useful
     state.insights = [
         {
-            icon: '💡',
-            text: 'Your deep sleep increases by 18% when you stop screen time 1 hour before bed.',
-            meta: 'Pattern detected from 14 days of data',
+            icon: '🌙',
+            text: 'Your deep sleep increases by <strong>23%</strong> when you avoid screens 1+ hours before bed. You\'ve done this 4 of the last 7 nights.',
+            meta: 'Sleep pattern • High confidence',
         },
         {
             icon: '📈',
-            text: 'Your average readiness score improved 8 points this week compared to last.',
-            meta: 'Weekly trend',
+            text: 'This week\'s readiness average: <strong>74</strong> (up from 68 last week). The biggest factor? Consistent 7+ hour sleep nights.',
+            meta: 'Weekly progress • Trending up',
         },
         {
             icon: '⚡',
-            text: 'You report highest energy on days following 7+ hours of sleep.',
-            meta: 'Correlation found',
+            text: 'Wednesday\'s low energy (2/5) followed your shortest sleep night. Your body needs 7+ hours to feel your best.',
+            meta: 'Sleep-energy correlation • 14 data points',
         },
     ];
 
+    // Add demo mode indicator
+    showDemoBanner();
+
     renderDashboard();
+}
+
+/**
+ * Show demo mode banner
+ */
+function showDemoBanner() {
+    // Remove existing banner if present
+    const existing = document.querySelector('.demo-banner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.className = 'demo-banner';
+    banner.innerHTML = `
+        <span class="demo-banner-icon">✨</span>
+        <span class="demo-banner-text">Demo Mode — Showing sample data</span>
+        <button class="demo-banner-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    document.body.prepend(banner);
 }
