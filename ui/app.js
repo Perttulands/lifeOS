@@ -10,7 +10,7 @@ const CONFIG = {
     API_BASE: '/api',
     REFRESH_INTERVAL: 5 * 60 * 1000, // 5 minutes
     ANIMATION_DURATION: 600,
-    DEMO_MODE: true, // Set to false when API is ready
+    DEMO_MODE: false, // API is ready
 };
 
 // === State ===
@@ -97,27 +97,151 @@ async function loadDashboardData() {
         return;
     }
 
+    showLoadingState(true);
+
     try {
-        const [sleepRes, briefRes, insightsRes] = await Promise.all([
-            fetch(`${CONFIG.API_BASE}/data/sleep?days=7`),
-            fetch(`${CONFIG.API_BASE}/insights/brief`),
+        // Fetch all data in parallel
+        const [todayRes, sleepRes, readinessRes, patternsRes] = await Promise.all([
+            fetch(`${CONFIG.API_BASE}/today`),
+            fetch(`${CONFIG.API_BASE}/data/sleep?limit=7`),
+            fetch(`${CONFIG.API_BASE}/data/readiness?limit=7`),
             fetch(`${CONFIG.API_BASE}/insights/patterns`),
         ]);
 
-        const sleep = await sleepRes.json();
-        const brief = await briefRes.json();
-        const insights = await insightsRes.json();
+        // Check for errors
+        if (!todayRes.ok || !sleepRes.ok || !readinessRes.ok) {
+            throw new Error('API request failed');
+        }
 
-        state.sleepData = sleep;
-        state.brief = brief;
-        state.insights = insights;
+        const today = await todayRes.json();
+        const sleepData = await sleepRes.json();
+        const readinessData = await readinessRes.json();
+        const patterns = patternsRes.ok ? await patternsRes.json() : [];
 
+        // Transform sleep data for chart (reverse to chronological order)
+        state.sleepData = sleepData.reverse().map(d => ({
+            date: d.date,
+            duration: d.value || 0,
+            quality: d.metadata?.score || 70,
+            deep: (d.metadata?.total_sleep_duration || 0) / 3600 * 0.2, // Approximate
+            rem: (d.metadata?.total_sleep_duration || 0) / 3600 * 0.25,
+        }));
+
+        // Transform readiness data
+        state.readinessData = readinessData.reverse().map(d => ({
+            date: d.date,
+            score: d.value || 0,
+        }));
+
+        // Generate energy data (we'll use journal entries or empty)
+        state.energyData = generateEnergyPlaceholder(7, today.energy_log?.level);
+
+        // Transform brief
+        if (today.brief && today.brief.content) {
+            state.brief = {
+                text: today.brief.content,
+                generatedAt: formatTime(today.brief.generated_at),
+                tags: extractTags(today.brief.content),
+            };
+        } else {
+            state.brief = {
+                text: 'No brief available yet. <a href="#" onclick="refreshBrief(); return false;">Generate one</a> or sync your Oura data first.',
+                generatedAt: 'Not generated',
+                tags: [],
+            };
+        }
+
+        // Transform patterns to insights
+        state.insights = patterns.slice(0, 3).map(p => ({
+            icon: getPatternIcon(p.pattern_type),
+            text: p.description,
+            meta: `${p.pattern_type} • ${Math.round(p.confidence * 100)}% confidence`,
+        }));
+
+        // If no patterns, show placeholder
+        if (state.insights.length === 0) {
+            state.insights = [{
+                icon: '💡',
+                text: 'Insights will appear here once you have a few days of data.',
+                meta: 'Keep syncing!',
+            }];
+        }
+
+        showLoadingState(false);
         renderDashboard();
+
     } catch (error) {
         console.error('Failed to load dashboard data:', error);
-        showToast('Failed to load data. Using demo mode.', 'error');
-        loadDemoData();
+        showLoadingState(false);
+        showErrorState(true);
+        showToast('Failed to load data. Check your connection.', 'error');
     }
+}
+
+function showLoadingState(loading) {
+    const cards = document.querySelectorAll('.score-card, .brief-card, .trend-card');
+    cards.forEach(card => {
+        if (loading) {
+            card.classList.add('loading');
+        } else {
+            card.classList.remove('loading');
+        }
+    });
+}
+
+function showErrorState(hasError) {
+    const briefContent = document.getElementById('briefContent');
+    if (hasError) {
+        briefContent.innerHTML = `
+            <p class="brief-text error-text">
+                Unable to connect to the API.
+                <a href="#" onclick="loadDashboardData(); return false;">Try again</a>
+            </p>
+        `;
+    }
+}
+
+function formatTime(isoString) {
+    if (!isoString) return 'Unknown';
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch {
+        return 'Unknown';
+    }
+}
+
+function extractTags(content) {
+    // Extract meaningful tags from brief content
+    const tags = [];
+    if (content.toLowerCase().includes('sleep')) tags.push('sleep');
+    if (content.toLowerCase().includes('energy')) tags.push('energy');
+    if (content.toLowerCase().includes('readiness')) tags.push('readiness');
+    if (content.toLowerCase().includes('pattern')) tags.push('pattern');
+    return tags.slice(0, 3);
+}
+
+function getPatternIcon(patternType) {
+    const icons = {
+        'correlation': '📊',
+        'trend': '📈',
+        'anomaly': '⚠️',
+        'weekly': '📅',
+    };
+    return icons[patternType] || '💡';
+}
+
+function generateEnergyPlaceholder(days, todayLevel) {
+    const data = [];
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        data.push({
+            date: date.toISOString().split('T')[0],
+            level: i === 0 ? todayLevel : null,
+        });
+    }
+    return data;
 }
 
 // === Demo Data ===
@@ -518,15 +642,18 @@ async function submitLog() {
 
     try {
         if (!CONFIG.DEMO_MODE) {
-            await fetch(`${CONFIG.API_BASE}/log`, {
+            const response = await fetch(`${CONFIG.API_BASE}/log`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     energy: state.selectedEnergy,
-                    note: note,
-                    timestamp: new Date().toISOString(),
+                    notes: note || null,
                 }),
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to log');
+            }
         }
 
         // Update local state
@@ -538,7 +665,7 @@ async function submitLog() {
         document.getElementById('noteInput').value = '';
         state.selectedEnergy = null;
 
-        showToast('Logged! 🎉', 'success');
+        showToast('Logged!', 'success');
     } catch (error) {
         console.error('Failed to submit log:', error);
         showToast('Failed to log. Try again.', 'error');
@@ -555,8 +682,23 @@ async function refreshBrief() {
 
     try {
         if (!CONFIG.DEMO_MODE) {
-            const res = await fetch(`${CONFIG.API_BASE}/insights/generate`, { method: 'POST' });
-            state.brief = await res.json();
+            const res = await fetch(`${CONFIG.API_BASE}/insights/brief?generate=true`);
+
+            if (!res.ok) {
+                throw new Error('Failed to generate brief');
+            }
+
+            const data = await res.json();
+
+            if (data && data.content) {
+                state.brief = {
+                    text: data.content,
+                    generatedAt: formatTime(data.created_at),
+                    tags: extractTags(data.content),
+                };
+            } else {
+                throw new Error('No brief data returned');
+            }
         } else {
             // Simulate refresh in demo mode
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -565,7 +707,8 @@ async function refreshBrief() {
         renderBrief();
         showToast('Brief refreshed!', 'success');
     } catch (error) {
-        showToast('Failed to refresh brief', 'error');
+        console.error('Failed to refresh brief:', error);
+        showToast('Failed to refresh brief. Need Oura data first?', 'error');
     } finally {
         btn.disabled = false;
     }

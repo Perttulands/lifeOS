@@ -1043,3 +1043,41 @@ body {
 button:focus:not(:focus-visible) {
     outline: none;
 }
+
+/* === Loading States === */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.05) 50%,
+        transparent 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.error-text {
+    color: var(--error);
+}
+
+.error-text a {
+    color: var(--accent-light);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.error-text a:hover {
+    color: var(--accent-primary);
+}
