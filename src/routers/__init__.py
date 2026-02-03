@@ -14,6 +14,7 @@ from .settings import router as settings_router
 from .backup import router as backup_router
 from .calendar import router as calendar_router
 from .stats import router as stats_router
+from .preferences import router as preferences_router
 
 __all__ = [
     "health_router",
@@ -26,4 +27,5 @@ __all__ = [
     "backup_router",
     "calendar_router",
     "stats_router",
+    "preferences_router",
 ]

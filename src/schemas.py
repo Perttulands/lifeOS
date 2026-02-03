@@ -361,3 +361,50 @@ class TokenUsageResponse(BaseModel):
 class StatsResponse(BaseModel):
     cost_report: CostReportResponse
     recent_usage: List[TokenUsageResponse]
+
+
+# === Preference Schemas ===
+
+class PreferenceResponse(BaseModel):
+    id: int
+    category: str
+    key: str
+    value: dict
+    weight: float
+    source: str
+    evidence_count: int
+    last_reinforced: str
+
+    class Config:
+        from_attributes = True
+
+
+class PreferenceContextResponse(BaseModel):
+    tone_style: str
+    focus_areas: List[str]
+    include_comparisons: bool
+    include_predictions: bool
+    preferred_insight_length: str
+    active_patterns: List[str]
+
+
+class SetPreferenceRequest(BaseModel):
+    category: str
+    key: str
+    value: dict
+
+
+class InsightFeedbackRequest(BaseModel):
+    insight_id: int
+    feedback_type: str  # helpful, not_helpful, acted_on, dismissed
+    context: Optional[Dict] = None
+
+
+class InsightFeedbackResponse(BaseModel):
+    id: int
+    insight_id: int
+    feedback_type: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
