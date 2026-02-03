@@ -1,25 +1,33 @@
-version: "3.8"
+# LifeOS Docker Compose - Development
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#
+# For production, use: docker compose -f docker-compose.production.yml up -d
 
 services:
   lifeos:
-    build: .
-    container_name: lifeos
+    build:
+      context: .
+      target: production
+    container_name: lifeos-dev
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       # Persist SQLite database
       - lifeos-data:/data
-      # Optional: mount UI for development
-      # - ./ui:/app/ui:ro
+      # Mount source for development (hot reload)
+      - ./src:/app/src:ro
+      - ./ui:/app/ui:ro
     environment:
       - DATABASE_URL=sqlite:////data/lifeos.db
       - HOST=0.0.0.0
       - PORT=8080
-      # Add your tokens via .env file or uncomment below
-      # - OURA_TOKEN=${OURA_TOKEN}
-      # - LITELLM_API_KEY=${LITELLM_API_KEY}
-      # - LITELLM_MODEL=${LITELLM_MODEL:-gpt-4o-mini}
+      # Development: single worker for easier debugging
+      - GUNICORN_WORKERS=1
+      - GUNICORN_THREADS=2
     env_file:
       - .env
     healthcheck:

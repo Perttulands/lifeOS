@@ -84,6 +84,61 @@ async def clear_errors():
     return {"success": True, "message": "Error history cleared"}
 
 
+@router.get("/ready")
+async def readiness(db: Session = Depends(get_db)):
+    """
+    Readiness probe for load balancers and orchestrators.
+
+    Returns 200 if the service is ready to accept traffic:
+    - Database is connected and responsive
+    - Critical services are operational
+
+    Returns 503 if the service is not ready.
+
+    Use this for:
+    - Kubernetes readiness probes
+    - Load balancer health checks
+    - Rolling deployment checks
+    """
+    from ..health import get_health_monitor, ServiceStatus
+
+    monitor = get_health_monitor()
+    db_check = await monitor.check_database(db)
+
+    if db_check.status == ServiceStatus.HEALTHY:
+        return {
+            "ready": True,
+            "database": "connected",
+            "latency_ms": db_check.latency_ms
+        }
+
+    # Service not ready - return 503
+    from fastapi import HTTPException
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "ready": False,
+            "database": db_check.message,
+            "reason": "Database not ready"
+        }
+    )
+
+
+@router.get("/live")
+async def liveness():
+    """
+    Liveness probe for orchestrators.
+
+    Returns 200 if the process is alive and responding.
+    This is a minimal check - use /ready for full readiness.
+
+    Use this for:
+    - Kubernetes liveness probes
+    - Process monitoring
+    """
+    return {"alive": True}
+
+
 @router.get("/uptime")
 async def get_uptime():
     """Get system uptime information."""

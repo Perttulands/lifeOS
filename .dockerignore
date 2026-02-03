@@ -59,3 +59,15 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Deployment (scripts and backups)
+deploy/deploy.sh
+backups/
+
+# Tests
+tests/
+
+# Docker (avoid recursive context)
+docker-compose*.yml
+Dockerfile
+.dockerignore
