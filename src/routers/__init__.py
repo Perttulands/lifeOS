@@ -15,6 +15,7 @@ from .backup import router as backup_router
 from .calendar import router as calendar_router
 from .stats import router as stats_router
 from .preferences import router as preferences_router
+from .backfill import router as backfill_router
 
 __all__ = [
     "health_router",
@@ -28,4 +29,5 @@ __all__ = [
     "calendar_router",
     "stats_router",
     "preferences_router",
+    "backfill_router",
 ]

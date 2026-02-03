@@ -25,6 +25,7 @@ from .routers import (
     calendar_router,
     stats_router,
     preferences_router,
+    backfill_router,
 )
 
 
@@ -57,6 +58,7 @@ app.include_router(backup_router)
 app.include_router(calendar_router)
 app.include_router(stats_router)
 app.include_router(preferences_router)
+app.include_router(backfill_router)
 
 
 # === Startup ===
