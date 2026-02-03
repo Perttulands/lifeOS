@@ -1081,3 +1081,15 @@ button:focus:not(:focus-visible) {
 .error-text a:hover {
     color: var(--accent-primary);
 }
+
+/* === Empty State === */
+.chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 160px;
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+    text-align: center;
+    padding: var(--space-lg);
+}

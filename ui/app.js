@@ -348,6 +348,13 @@ function renderBrief() {
 }
 
 function renderSleepCard() {
+    // Handle no data case
+    if (!state.sleepData || state.sleepData.length === 0) {
+        document.querySelector('#sleepCard .value-main').textContent = '--';
+        document.querySelector('#sleepCard .quality-label').textContent = 'No data';
+        return;
+    }
+
     const latest = state.sleepData[state.sleepData.length - 1];
     const avg = state.sleepData.reduce((sum, d) => sum + d.duration, 0) / state.sleepData.length;
     const diff = latest.duration - avg;
@@ -384,6 +391,13 @@ function renderSleepCard() {
 }
 
 function renderReadinessCard() {
+    // Handle no data case
+    if (!state.readinessData || state.readinessData.length === 0) {
+        document.querySelector('#readinessCard .value-main').textContent = '--';
+        document.querySelector('#readinessCard .quality-label').textContent = 'No data';
+        return;
+    }
+
     const latest = state.readinessData[state.readinessData.length - 1];
     const avg = state.readinessData.reduce((sum, d) => sum + d.score, 0) / state.readinessData.length;
     const diff = latest.score - avg;
@@ -487,20 +501,31 @@ function renderTrendChart() {
 
     switch (state.currentMetric) {
         case 'sleep':
-            data = state.sleepData.map(d => d.duration);
+            data = (state.sleepData || []).map(d => d.duration);
             color = '#6366f1';
             label = 'Sleep (hours)';
             break;
         case 'readiness':
-            data = state.readinessData.map(d => d.score);
+            data = (state.readinessData || []).map(d => d.score);
             color = '#10b981';
             label = 'Readiness Score';
             break;
         case 'energy':
-            data = state.energyData.map(d => d.level || 0);
+            data = (state.energyData || []).map(d => d.level || 0);
             color = '#f59e0b';
             label = 'Energy Level';
             break;
+    }
+
+    // Handle empty data
+    if (!data || data.length === 0) {
+        container.innerHTML = `
+            <div class="chart-empty">
+                <p>No data available yet. Sync your Oura data to see trends.</p>
+            </div>
+        `;
+        legend.innerHTML = '';
+        return;
     }
 
     const width = container.clientWidth || 600;
