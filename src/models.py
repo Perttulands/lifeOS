@@ -280,3 +280,43 @@ class InsightFeedback(Base):
         Index('idx_feedback_insight', 'insight_id'),
         Index('idx_feedback_type', 'feedback_type'),
     )
+
+
+class VoiceNote(Base):
+    """
+    Voice notes with transcription.
+
+    Stores uploaded audio files and their Whisper transcriptions.
+    After transcription, the text is auto-categorized through CaptureService.
+    """
+    __tablename__ = "voice_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, default=1)
+    filename = Column(String(255), nullable=False)     # Original filename
+    file_path = Column(String(500), nullable=False)    # Storage path
+    file_size = Column(Integer)                        # Size in bytes
+    duration_seconds = Column(Float)                   # Audio duration
+    mime_type = Column(String(100))                    # audio/mpeg, audio/wav, etc.
+
+    # Transcription
+    transcription = Column(Text)                       # Whisper transcription result
+    transcription_status = Column(String(20), default="pending")  # pending, processing, completed, failed
+    transcription_error = Column(Text)                 # Error message if failed
+    transcription_language = Column(String(10))        # Detected language code
+
+    # Auto-categorization result
+    categorized_type = Column(String(20))              # note, task, energy
+    categorized_id = Column(Integer)                   # ID of created note/task/entry
+    categorization_status = Column(String(20), default="pending")  # pending, completed, skipped
+
+    # Metadata
+    source = Column(String(50), default="upload")      # upload, telegram, discord
+    extra_data = Column("metadata", JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_voice_note_status', 'transcription_status'),
+        Index('idx_voice_note_created', 'created_at'),
+    )
