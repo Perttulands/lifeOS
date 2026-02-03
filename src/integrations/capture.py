@@ -170,11 +170,12 @@ Be generous with categorization - when in doubt, classify as a note."""
     def _categorize(self, text: str) -> Optional[Dict[str, Any]]:
         """Use AI to categorize the input text."""
         try:
-            response, _ = self.ai._call_llm(
+            response, _, _, _ = self.ai._call_llm(
                 system_prompt=self.SYSTEM_PROMPT,
                 user_prompt=text,
                 temperature=0.3,  # Lower temp for consistent categorization
-                max_tokens=300
+                max_tokens=300,
+                feature="capture"
             )
 
             # Extract JSON from response

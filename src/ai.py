@@ -154,12 +154,20 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
         system_prompt: str,
         user_prompt: str,
         temperature: float = 0.7,
-        max_tokens: int = 500
-    ) -> tuple[str, int]:
+        max_tokens: int = 500,
+        feature: str = "other"
+    ) -> tuple[str, int, int, int]:
         """
         Make a call to the LLM via LiteLLM.
 
-        Returns: (response_text, tokens_used)
+        Args:
+            system_prompt: System prompt for the LLM
+            user_prompt: User prompt
+            temperature: Sampling temperature
+            max_tokens: Max tokens to generate
+            feature: Feature name for token tracking
+
+        Returns: (response_text, total_tokens, input_tokens, output_tokens)
         """
         try:
             response = completion(
@@ -173,14 +181,73 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
             )
 
             content = response.choices[0].message.content
-            tokens = response.usage.total_tokens if response.usage else 0
 
-            return content, tokens
+            # Extract token counts
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            input_tokens = response.usage.prompt_tokens if response.usage else 0
+            output_tokens = response.usage.completion_tokens if response.usage else 0
+
+            # Log token usage
+            self._log_token_usage(feature, input_tokens, output_tokens)
+
+            return content, total_tokens, input_tokens, output_tokens
 
         except APIError as e:
             raise RuntimeError(f"LiteLLM API error: {e}")
         except Exception as e:
             raise RuntimeError(f"AI call failed: {e}")
+
+    def _log_token_usage(
+        self,
+        feature: str,
+        input_tokens: int,
+        output_tokens: int
+    ):
+        """Log token usage to database if available."""
+        try:
+            from .token_tracker import AIFeature, TokenUsage
+            from .database import SessionLocal
+
+            # Map feature string to enum
+            try:
+                ai_feature = AIFeature(feature)
+            except ValueError:
+                ai_feature = AIFeature.OTHER
+
+            db = SessionLocal()
+            try:
+                usage = TokenUsage(
+                    feature=ai_feature.value,
+                    model=self.model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=input_tokens + output_tokens,
+                    cost_usd=self._calculate_cost(input_tokens, output_tokens)
+                )
+                db.add(usage)
+                db.commit()
+            finally:
+                db.close()
+        except Exception:
+            # Don't fail AI calls if token tracking fails
+            pass
+
+    def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """Calculate cost based on model pricing."""
+        from .token_tracker import MODEL_PRICING
+
+        model_lower = self.model.lower()
+        pricing = MODEL_PRICING.get("default")
+
+        for key, p in MODEL_PRICING.items():
+            if key in model_lower:
+                pricing = p
+                break
+
+        input_cost = (input_tokens / 1_000_000) * pricing["input"]
+        output_cost = (output_tokens / 1_000_000) * pricing["output"]
+
+        return round(input_cost + output_cost, 6)
 
     def generate_daily_brief(
         self,
@@ -249,11 +316,12 @@ Tone: Supportive coach, not demanding boss. ~200 words."""
         user_prompt = "\n".join(prompt_parts)
 
         # Call LLM
-        content, tokens = self._call_llm(
+        content, tokens, _, _ = self._call_llm(
             system_prompt=self.SYSTEM_PROMPT_BRIEF,
             user_prompt=user_prompt,
             temperature=0.7,
-            max_tokens=300
+            max_tokens=300,
+            feature="daily_brief"
         )
 
         return InsightResult(
@@ -352,11 +420,12 @@ Return as JSON array:
 
         user_prompt = "\n".join(prompt_parts)
 
-        content, tokens = self._call_llm(
+        content, tokens, _, _ = self._call_llm(
             system_prompt=self.SYSTEM_PROMPT_PATTERN,
             user_prompt=user_prompt,
             temperature=0.5,  # Lower temp for more consistent JSON
-            max_tokens=800
+            max_tokens=800,
+            feature="pattern_detection"
         )
 
         # Parse JSON response
@@ -433,11 +502,12 @@ Predict my energy for today. Return JSON:
 
         user_prompt = "\n".join(prompt_parts)
 
-        content, _ = self._call_llm(
+        content, _, _, _ = self._call_llm(
             system_prompt=self.SYSTEM_PROMPT_ENERGY,
             user_prompt=user_prompt,
             temperature=0.6,
-            max_tokens=300
+            max_tokens=300,
+            feature="energy_prediction"
         )
 
         # Parse JSON
@@ -511,11 +581,12 @@ DAY BY DAY:""")
 
         user_prompt = "\n".join(prompt_parts)
 
-        content, tokens = self._call_llm(
+        content, tokens, _, _ = self._call_llm(
             system_prompt=self.SYSTEM_PROMPT_WEEKLY,
             user_prompt=user_prompt,
             temperature=0.7,
-            max_tokens=400
+            max_tokens=400,
+            feature="weekly_review"
         )
 
         return InsightResult(
