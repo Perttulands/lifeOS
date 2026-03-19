@@ -109,25 +109,14 @@ lifeos weekly [--format json|text]
 
 ### Hermes's 7am Morning Routine (the thing that proves G1)
 
-Configured as an OpenClaw cron job:
+**Hermes IS the delivery mechanism.** No Discord webhook, no bash script, no intermediaries.
 
-```bash
-#!/bin/bash
-cd /home/polis/projects/lifeOS && source .venv/bin/activate
+OpenClaw cron fires an isolated agentTurn at 07:00 Europe/Helsinki daily:
+1. Hermes runs `lifeos sync oura` to pull fresh Oura data
+2. Hermes runs `lifeos brief --format text` to generate the brief
+3. Hermes sends the brief to Perttu via the Discord message tool
 
-# 1. Sync fresh data (errors go to stderr, don't block brief)
-lifeos sync oura 2>/dev/null || true
-lifeos sync calendar 2>/dev/null || true
-
-# 2. Generate brief
-BRIEF=$(lifeos brief --format text)
-EXIT=$?
-
-# 3. Deliver via Discord (Hermes handles this — relay or direct webhook)
-# Hermes receives BRIEF as output and delivers it
-```
-
-**This cron entry must be created as part of Sprint 1 delivery.** A `lifeos brief` command that is never triggered is worthless.
+Cron ID: `lifeos-morning-brief`. This is the simplest possible architecture: cron → Hermes → Discord.
 
 ### Conversational Capture (Sprint 2)
 
