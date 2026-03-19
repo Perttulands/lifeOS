@@ -5,7 +5,7 @@ Tests the OuraClient and OuraSyncService classes.
 """
 
 import pytest
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from unittest.mock import patch, MagicMock
 import json
 
@@ -132,19 +132,19 @@ class TestOuraToken:
 
     def test_token_not_expired_when_future(self):
         """Token with future expiry should not be expired."""
-        future = datetime.utcnow() + timedelta(hours=1)
+        future = datetime.now(timezone.utc) + timedelta(hours=1)
         token = OuraToken(access_token="test", expires_at=future)
         assert not token.is_expired
 
     def test_token_expired_with_buffer(self):
         """Token expiring within 5 minutes should be marked expired."""
-        soon = datetime.utcnow() + timedelta(minutes=3)
+        soon = datetime.now(timezone.utc) + timedelta(minutes=3)
         token = OuraToken(access_token="test", expires_at=soon)
         assert token.is_expired
 
     def test_token_expired_when_past(self):
         """Token with past expiry should be expired."""
-        past = datetime.utcnow() - timedelta(hours=1)
+        past = datetime.now(timezone.utc) - timedelta(hours=1)
         token = OuraToken(access_token="test", expires_at=past)
         assert token.is_expired
 

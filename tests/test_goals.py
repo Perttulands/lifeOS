@@ -5,7 +5,7 @@ Tests the GoalService, models, and API endpoints.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from src.models import Goal, Milestone
@@ -301,7 +301,7 @@ class TestVelocityTracking:
         m1 = db.query(Milestone).get(m1.id)
 
         # Manually set completion time to simulate time passing
-        m1.completed_at = datetime.utcnow() - timedelta(days=7)
+        m1.completed_at = datetime.now(timezone.utc) - timedelta(days=7)
         db.commit()
 
         # Complete second milestone
@@ -315,7 +315,7 @@ class TestVelocityTracking:
     def test_get_velocity_metrics(self, db, create_goal, create_milestone):
         """Test getting velocity metrics."""
         # Set target date 4 weeks from now
-        target = (datetime.utcnow() + timedelta(weeks=4)).strftime("%Y-%m-%d")
+        target = (datetime.now(timezone.utc) + timedelta(weeks=4)).strftime("%Y-%m-%d")
         goal = create_goal(title="Big project", target_date=target)
 
         m1 = create_milestone(goal_id=goal.id, title="Phase 1", order=1)

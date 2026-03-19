@@ -3,7 +3,7 @@ LifeOS Token Cost Tracking
 
 Tracks token usage per AI call and calculates costs per feature.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -54,7 +54,7 @@ class TokenUsage(Base):
     __tablename__ = "token_usage"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     feature = Column(String(50), nullable=False)  # daily_brief, weekly_review, etc.
     model = Column(String(100), nullable=False)   # Model identifier
     input_tokens = Column(Integer, nullable=False, default=0)
@@ -181,7 +181,7 @@ class TokenTracker:
         days: int = 30
     ) -> List[FeatureCostSummary]:
         """Get usage summary grouped by feature."""
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         usages = self.db.query(TokenUsage).filter(
             TokenUsage.timestamp >= cutoff
@@ -217,7 +217,7 @@ class TokenTracker:
         days: int = 30
     ) -> Dict[str, float]:
         """Get daily cost totals."""
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         usages = self.db.query(TokenUsage).filter(
             TokenUsage.timestamp >= cutoff
@@ -236,8 +236,8 @@ class TokenTracker:
         days: int = 30
     ) -> CostReport:
         """Generate complete cost report."""
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        end_date = datetime.utcnow()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        end_date = datetime.now(timezone.utc)
 
         usages = self.db.query(TokenUsage).filter(
             TokenUsage.timestamp >= cutoff

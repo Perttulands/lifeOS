@@ -6,7 +6,7 @@ Tracks system health, uptime, and provides error alerting hooks.
 
 import time
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -33,7 +33,7 @@ class ServiceCheck:
     status: ServiceStatus
     message: str
     latency_ms: Optional[float] = None
-    last_checked: datetime = field(default_factory=datetime.utcnow)
+    last_checked: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -63,7 +63,7 @@ class HealthMonitor:
     MAX_ERRORS = 100  # Keep last 100 errors
 
     def __init__(self):
-        self._start_time = datetime.utcnow()
+        self._start_time = datetime.now(timezone.utc)
         self._errors: deque = deque(maxlen=self.MAX_ERRORS)
         self._last_alert_time: Optional[datetime] = None
         self._alert_cooldown = timedelta(minutes=5)
@@ -71,7 +71,7 @@ class HealthMonitor:
     @property
     def uptime_seconds(self) -> float:
         """Get uptime in seconds."""
-        delta = datetime.utcnow() - self._start_time
+        delta = datetime.now(timezone.utc) - self._start_time
         return delta.total_seconds()
 
     @property
@@ -97,7 +97,7 @@ class HealthMonitor:
             "type": error_type,
             "message": message,
             "context": context or {},
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         self._errors.append(error)
 
@@ -114,11 +114,11 @@ class HealthMonitor:
         """Check if we should send an alert (respecting cooldown)."""
         if self._last_alert_time is None:
             return True
-        return datetime.utcnow() - self._last_alert_time > self._alert_cooldown
+        return datetime.now(timezone.utc) - self._last_alert_time > self._alert_cooldown
 
     def mark_alerted(self):
         """Mark that an alert was sent."""
-        self._last_alert_time = datetime.utcnow()
+        self._last_alert_time = datetime.now(timezone.utc)
 
     async def check_database(self, db: Session) -> ServiceCheck:
         """Check database connectivity."""
@@ -246,7 +246,7 @@ class HealthMonitor:
             version=self.VERSION,
             uptime_seconds=self.uptime_seconds,
             started_at=self.started_at,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             services=services,
             recent_errors=self.get_recent_errors()
         )
@@ -277,7 +277,7 @@ class HealthMonitor:
             alert_text += f"Message: {message}\n"
             if context:
                 alert_text += f"Context: {context}\n"
-            alert_text += f"\nTime: {datetime.utcnow().isoformat()}"
+            alert_text += f"\nTime: {datetime.now(timezone.utc).isoformat()}"
 
             # Send to all enabled channels
             for channel in notifier.enabled_channels:

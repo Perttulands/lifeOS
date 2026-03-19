@@ -5,7 +5,7 @@ Tests the OAuth2 flow, event sync, and meeting statistics.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 import httpx
@@ -192,7 +192,7 @@ class TestTokenExpiry:
             user_id=1,
             provider="google",
             access_token="test",
-            expires_at=datetime.utcnow() + timedelta(hours=1)
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
         )
 
         assert is_token_expired(token) is False
@@ -203,7 +203,7 @@ class TestTokenExpiry:
             user_id=1,
             provider="google",
             access_token="test",
-            expires_at=datetime.utcnow() - timedelta(hours=1)
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1)
         )
 
         assert is_token_expired(token) is True
@@ -214,7 +214,7 @@ class TestTokenExpiry:
             user_id=1,
             provider="google",
             access_token="test",
-            expires_at=datetime.utcnow() + timedelta(minutes=3)  # Within 5 min buffer
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=3)  # Within 5 min buffer
         )
 
         assert is_token_expired(token, buffer_minutes=5) is True

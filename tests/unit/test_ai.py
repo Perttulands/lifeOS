@@ -146,7 +146,7 @@ class TestGenerateBrief:
                 calendar_events=[]
             )
 
-            result = ai.generate_brief(context)
+            result = ai.generate_daily_brief(context, [])
 
             assert isinstance(result, InsightResult)
             assert "sleep" in result.content.lower() or len(result.content) > 0
@@ -175,7 +175,7 @@ class TestGenerateBrief:
                 calendar_events=[]
             )
 
-            result = ai.generate_brief(context)
+            result = ai.generate_daily_brief(context, [])
 
             assert result is not None
 
@@ -202,7 +202,7 @@ class TestGenerateBrief:
                 calendar_events=[]
             )
 
-            ai.generate_brief(context, personalization="Use casual tone.")
+            ai.generate_daily_brief(context, [], personalization_prompt="Use casual tone.")
 
             # Verify personalization was passed to completion
             call_args = mock_completion.call_args
@@ -261,7 +261,17 @@ class TestDetectPatterns:
                     calendar_events=[]
                 ))
 
-            patterns = ai.detect_patterns(history)
+            data_points = [
+                {
+                    "date": f"2026-02-0{i+1}",
+                    "type": "sleep",
+                    "value": 7.0 + i * 0.1,
+                    "metadata": {"deep_sleep_hours": 1.5}
+                }
+                for i in range(7)
+            ]
+
+            patterns = ai.analyze_patterns(data_points, days=7)
 
             assert isinstance(patterns, list)
 
@@ -335,7 +345,5 @@ class TestPredictEnergy:
                 calendar_events=[]
             )
 
-            # Method may not exist - test gracefully
-            if hasattr(ai, 'predict_energy'):
-                result = ai.predict_energy(context)
-                assert result is not None
+            result = ai.predict_energy(context, [])
+            assert result is not None

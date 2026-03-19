@@ -5,7 +5,7 @@ Quick capture, logging, tasks, and notes endpoints.
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -164,3 +164,37 @@ async def get_notes(
         )
         for n in notes
     ]
+
+
+@router.patch("/tasks/{task_id}")
+async def update_task(
+    task_id: int,
+    updates: dict,
+    db: Session = Depends(get_db)
+):
+    """Update task fields."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if "status" in updates:
+        task.status = updates["status"]
+    if "priority" in updates:
+        task.priority = updates["priority"]
+    if "title" in updates:
+        task.title = updates["title"]
+
+    db.commit()
+    db.refresh(task)
+
+    return TaskResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        priority=task.priority,
+        due_date=task.due_date,
+        tags=task.tags or [],
+        source=task.source,
+        created_at=task.created_at.isoformat()
+    )

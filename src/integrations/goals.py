@@ -8,7 +8,7 @@ and adapt timelines based on your real velocity.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -254,7 +254,7 @@ Be honest but encouraging. Celebrate progress, acknowledge challenges, give prac
             # Update goal with AI breakdown data
             goal.estimated_hours = total_hours
             goal.ai_breakdown = result
-            goal.breakdown_generated_at = datetime.utcnow()
+            goal.breakdown_generated_at = datetime.now(timezone.utc)
 
             self.db.commit()
 
@@ -339,7 +339,7 @@ Be honest but encouraging. Celebrate progress, acknowledge challenges, give prac
         milestone.status = status
 
         if status == "completed":
-            milestone.completed_at = datetime.utcnow()
+            milestone.completed_at = datetime.now(timezone.utc)
             if actual_hours is not None:
                 milestone.actual_hours = actual_hours
 
@@ -438,7 +438,7 @@ Be honest but encouraging. Celebrate progress, acknowledge challenges, give prac
                 remaining = len([m for m in milestones if m.status not in ("completed", "skipped")])
                 if velocity > 0 and remaining > 0:
                     weeks_needed = remaining / velocity
-                    predicted = datetime.utcnow() + timedelta(weeks=weeks_needed)
+                    predicted = datetime.now(timezone.utc) + timedelta(weeks=weeks_needed)
                     goal.predicted_completion = predicted.strftime("%Y-%m-%d")
 
         self.db.commit()
@@ -460,7 +460,8 @@ Be honest but encouraging. Celebrate progress, acknowledge challenges, give prac
         # Calculate hours per week
         hours_per_week = None
         if goal.actual_hours and goal.created_at:
-            weeks_since_start = (datetime.utcnow() - goal.created_at).days / 7
+            created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
+            weeks_since_start = (datetime.now(timezone.utc) - created).days / 7
             if weeks_since_start > 0:
                 hours_per_week = goal.actual_hours / weeks_since_start
 
@@ -486,8 +487,8 @@ Be honest but encouraging. Celebrate progress, acknowledge challenges, give prac
     def _days_until(self, date_str: str) -> int:
         """Calculate days until a date string (YYYY-MM-DD)."""
         try:
-            target = datetime.strptime(date_str, "%Y-%m-%d")
-            return (target - datetime.utcnow()).days
+            target = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            return (target - datetime.now(timezone.utc)).days
         except ValueError:
             return 0
 

@@ -3,9 +3,10 @@ Data retrieval endpoints (sleep, readiness, activity).
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -14,6 +15,14 @@ from ..insights_service import InsightsService
 from ..schemas import DataPointResponse
 
 router = APIRouter(prefix="/api", tags=["data"])
+
+
+class CreateDataPointRequest(BaseModel):
+    date: str
+    source: str
+    type: str
+    value: float
+    extra_data: Optional[Dict] = None
 
 
 @router.get("/data/sleep", response_model=List[DataPointResponse])
@@ -167,3 +176,101 @@ async def get_today_summary(
             "generated_at": brief.created_at.isoformat() if brief else None
         } if brief else None
     }
+
+
+@router.get("/data", response_model=List[DataPointResponse])
+async def list_data_points(
+    type: Optional[str] = Query(None, description="Filter by type (sleep, activity, readiness, energy, mood)"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """List all data points with optional filters."""
+    query = db.query(DataPoint)
+
+    if type:
+        query = query.filter(DataPoint.type == type)
+    if start_date:
+        query = query.filter(DataPoint.date >= start_date)
+    if end_date:
+        query = query.filter(DataPoint.date <= end_date)
+
+    data = query.order_by(DataPoint.date.desc()).all()
+
+    return [
+        DataPointResponse(
+            id=d.id,
+            source=d.source,
+            type=d.type,
+            date=d.date,
+            value=d.value,
+            metadata=d.extra_data or {}
+        )
+        for d in data
+    ]
+
+
+@router.post("/data", response_model=DataPointResponse)
+async def create_data_point(
+    request: CreateDataPointRequest,
+    db: Session = Depends(get_db)
+):
+    """Create a new data point."""
+    data_point = DataPoint(
+        date=request.date,
+        source=request.source,
+        type=request.type,
+        value=request.value,
+        extra_data=request.extra_data,
+    )
+    db.add(data_point)
+    db.commit()
+    db.refresh(data_point)
+
+    return DataPointResponse(
+        id=data_point.id,
+        source=data_point.source,
+        type=data_point.type,
+        date=data_point.date,
+        value=data_point.value,
+        metadata=data_point.extra_data or {}
+    )
+
+
+@router.delete("/data/{id}")
+async def delete_data_point(
+    id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete a data point by ID."""
+    data_point = db.query(DataPoint).filter(DataPoint.id == id).first()
+    if not data_point:
+        raise HTTPException(status_code=404, detail="Data point not found")
+
+    db.delete(data_point)
+    db.commit()
+
+    return {"success": True}
+
+
+@router.get("/data/{date}", response_model=List[DataPointResponse])
+async def get_data_by_date(
+    date: str,
+    db: Session = Depends(get_db)
+):
+    """Get all data points for a specific date."""
+    data = db.query(DataPoint).filter(
+        DataPoint.date == date
+    ).order_by(DataPoint.type).all()
+
+    return [
+        DataPointResponse(
+            id=d.id,
+            source=d.source,
+            type=d.type,
+            date=d.date,
+            value=d.value,
+            metadata=d.extra_data or {}
+        )
+        for d in data
+    ]

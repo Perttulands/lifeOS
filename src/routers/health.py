@@ -2,7 +2,7 @@
 Health check endpoints.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -31,7 +31,7 @@ async def health():
     return HealthResponse(
         status="healthy",
         version=monitor.VERSION,
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.now(timezone.utc).isoformat()
     )
 
 

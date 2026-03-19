@@ -5,7 +5,7 @@ Business logic for generating, storing, and retrieving insights.
 Bridges between database, AI engine, and API.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy.orm import Session
@@ -273,7 +273,7 @@ class InsightsService:
         # Check for recent pattern detection
         if not force:
             recent = self.db.query(Pattern).filter(
-                Pattern.discovered_at > datetime.utcnow() - timedelta(days=1)
+                Pattern.discovered_at > datetime.now(timezone.utc) - timedelta(days=1)
             ).first()
             if recent:
                 return self.db.query(Pattern).filter(

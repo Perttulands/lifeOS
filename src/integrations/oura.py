@@ -8,7 +8,7 @@ API docs: https://cloud.ouraring.com/docs/
 """
 
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from enum import Enum
@@ -40,7 +40,7 @@ class OuraToken:
         """Check if token is expired (with 5 min buffer)."""
         if self.expires_at is None:
             return False  # PAT tokens don't expire
-        return datetime.utcnow() >= (self.expires_at - timedelta(minutes=5))
+        return datetime.now(timezone.utc) >= (self.expires_at - timedelta(minutes=5))
 
 
 @dataclass
@@ -136,7 +136,7 @@ class OuraClient:
             self.token = OuraToken(
                 access_token=data["access_token"],
                 refresh_token=data.get("refresh_token", self.token.refresh_token),
-                expires_at=datetime.utcnow() + timedelta(seconds=data.get("expires_in", 86400)),
+                expires_at=datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 86400)),
                 token_type=data.get("token_type", "Bearer")
             )
 
@@ -380,7 +380,7 @@ class OuraSyncService:
             if existing:
                 existing.value = dp.value
                 existing.extra_data = dp.extra_data
-                existing.timestamp = datetime.utcnow()
+                existing.timestamp = datetime.now(timezone.utc)
             else:
                 self.db.add(dp)
 

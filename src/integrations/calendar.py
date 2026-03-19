@@ -8,7 +8,7 @@ API docs: https://developers.google.com/calendar/api/v3/reference
 """
 
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from enum import Enum
@@ -309,7 +309,7 @@ def save_oauth_token(
     """
     # Calculate expiry time
     expires_in = token_data.get("expires_in", 3600)
-    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     # Check for existing token
     existing = db.query(OAuthToken).filter(
@@ -323,7 +323,7 @@ def save_oauth_token(
             existing.refresh_token = token_data["refresh_token"]
         existing.expires_at = expires_at
         existing.scope = token_data.get("scope", "")
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         return existing
 
@@ -373,7 +373,7 @@ def is_token_expired(token: OAuthToken, buffer_minutes: int = 5) -> bool:
     """
     if not token.expires_at:
         return True
-    return datetime.utcnow() >= (token.expires_at - timedelta(minutes=buffer_minutes))
+    return datetime.now(timezone.utc) >= (token.expires_at - timedelta(minutes=buffer_minutes))
 
 
 class CalendarSyncService:
@@ -411,7 +411,7 @@ class CalendarSyncService:
             if client._refresh_access_token():
                 # Update token in database
                 token.access_token = client.access_token
-                token.expires_at = datetime.utcnow() + timedelta(hours=1)
+                token.expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
                 self.db.commit()
             else:
                 return None
@@ -486,7 +486,7 @@ class CalendarSyncService:
             existing.attendees_count = attendees_count
             existing.is_recurring = "recurringEventId" in event_data
             existing.recurring_event_id = event_data.get("recurringEventId")
-            existing.synced_at = datetime.utcnow()
+            existing.synced_at = datetime.now(timezone.utc)
             return existing
 
         # Create new event
@@ -541,7 +541,7 @@ class CalendarSyncService:
             )
 
         # Calculate date range
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         time_min = now - timedelta(days=days_back)
         time_max = now + timedelta(days=days_forward)
 
@@ -649,7 +649,7 @@ class CalendarSyncService:
                         "meeting_count": meeting_count,
                         "total_minutes": total_minutes
                     }
-                    existing.timestamp = datetime.utcnow()
+                    existing.timestamp = datetime.now(timezone.utc)
                 else:
                     dp = DataPoint(
                         user_id=self.user_id,

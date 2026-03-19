@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
 
 from src.database import Base
 from src.models import (
@@ -27,7 +28,8 @@ def test_engine():
     """Create an in-memory SQLite engine for testing."""
     engine = create_engine(
         "sqlite:///:memory:",
-        connect_args={"check_same_thread": False}
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
     )
     Base.metadata.create_all(bind=engine)
     yield engine
@@ -341,14 +343,15 @@ def create_milestone(db: Session):
 def mock_ai():
     """Mock AI service for testing without API calls."""
     mock = MagicMock()
-    mock.generate_brief.return_value = MagicMock(
+    mock.generate_daily_brief.return_value = MagicMock(
         content="Your sleep was good. Energy should be high today.",
         confidence=0.85,
         context={"sleep_score": 85},
         tokens_used=150
     )
-    mock.detect_patterns.return_value = [
-        MagicMock(
+    from src.ai import PatternResult
+    mock.analyze_patterns.return_value = [
+        PatternResult(
             name="Sleep-Energy Correlation",
             description="More sleep leads to higher energy",
             pattern_type="correlation",
@@ -371,9 +374,10 @@ def mock_ai():
 @pytest.fixture
 def mock_analyzer():
     """Mock pattern analyzer for testing without scipy."""
+    from src.pattern_analyzer import DetectedPattern
     mock = MagicMock()
     mock.analyze_all.return_value = [
-        MagicMock(
+        DetectedPattern(
             name="Sleep-Energy Correlation",
             description="Statistical correlation detected",
             pattern_type="correlation",
@@ -381,9 +385,12 @@ def mock_analyzer():
             strength=0.72,
             confidence=0.85,
             sample_size=28,
-            actionable=True
+            actionable=True,
+            details={"source": "statistical"}
         )
     ]
+    mock._organize_data.return_value = {}
+    mock.analyze_sliding_window.return_value = []
     return mock
 
 

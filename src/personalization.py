@@ -5,7 +5,7 @@ Learns user preferences over time and provides personalized context
 for AI-generated insights.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
@@ -128,7 +128,7 @@ class PersonalizationService:
             pref.source = source
             pref.weight = 1.0 if source == "explicit" else pref.weight
             pref.evidence_count += 1
-            pref.last_reinforced = datetime.utcnow()
+            pref.last_reinforced = datetime.now(timezone.utc)
         else:
             pref = UserPreference(
                 user_id=user_id,
@@ -169,7 +169,7 @@ class PersonalizationService:
         else:
             pref.weight = max(0.0, pref.weight - 0.15)
 
-        pref.last_reinforced = datetime.utcnow()
+        pref.last_reinforced = datetime.now(timezone.utc)
         self.db.commit()
         return pref
 
@@ -289,7 +289,7 @@ class PersonalizationService:
                 if pref.value == value:
                     pref.weight = max(0.0, pref.weight - 0.1)
 
-            pref.last_reinforced = datetime.utcnow()
+            pref.last_reinforced = datetime.now(timezone.utc)
         else:
             # Create new inferred preference
             if positive:
@@ -368,7 +368,7 @@ class PersonalizationService:
 
     def decay_preferences(self, user_id: int = 1):
         """Apply decay to preferences that haven't been reinforced recently."""
-        cutoff = datetime.utcnow() - timedelta(days=7)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
 
         old_prefs = self.db.query(UserPreference).filter(
             UserPreference.user_id == user_id,

@@ -4,7 +4,7 @@ LifeOS Historical Data Backfill
 Handles importing 30-90 days of historical data on first connect.
 Supports Oura and Google Calendar with progress tracking.
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Callable
 from enum import Enum
@@ -57,7 +57,7 @@ class BackfillProgress:
         """Get elapsed time in seconds."""
         if not self.started_at:
             return 0.0
-        end_time = self.completed_at or datetime.utcnow()
+        end_time = self.completed_at or datetime.now(timezone.utc)
         return (end_time - self.started_at).total_seconds()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -177,7 +177,7 @@ class OuraBackfillService:
             total_days=days,
             completed_days=0,
             records_synced=0,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(timezone.utc)
         )
         _current_progress[BackfillSource.OURA.value] = progress
 
@@ -218,13 +218,13 @@ class OuraBackfillService:
 
             # Mark as completed
             progress.status = BackfillStatus.COMPLETED if not progress.errors else BackfillStatus.PARTIAL
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
             progress.current_date = None
 
         except Exception as e:
             progress.status = BackfillStatus.FAILED
             progress.errors.append(str(e))
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
 
         self._update_progress(progress)
         return progress
@@ -283,7 +283,7 @@ class CalendarBackfillService:
             total_days=total_days,
             completed_days=0,
             records_synced=0,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(timezone.utc)
         )
         _current_progress[BackfillSource.CALENDAR.value] = progress
 
@@ -310,13 +310,13 @@ class CalendarBackfillService:
                 if result.errors:
                     progress.errors.extend(result.errors)
 
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
             progress.current_date = None
 
         except Exception as e:
             progress.status = BackfillStatus.FAILED
             progress.errors.append(str(e))
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(timezone.utc)
 
         self._update_progress(progress)
         return progress

@@ -209,7 +209,7 @@ class TestGenerateDailyBrief:
 
         assert result.content == "Existing brief content"
         # AI should not be called
-        mock_ai.generate_brief.assert_not_called()
+        mock_ai.generate_daily_brief.assert_not_called()
 
     def test_calls_ai_with_personalization(
         self, db, create_data_point, mock_ai, mock_personalization
@@ -275,7 +275,7 @@ class TestDetectPatterns:
         service = InsightsService(db, ai=mock_ai, analyzer=None)
         patterns = service.detect_patterns(days=7, use_statistical=False, use_llm=True)
 
-        mock_ai.detect_patterns.assert_called_once()
+        mock_ai.analyze_patterns.assert_called_once()
 
     def test_stores_detected_patterns(
         self, db, generate_week_of_data, mock_ai, mock_analyzer
@@ -428,7 +428,7 @@ class TestForceRegenerate:
 
         assert result is not None
         # Should have called AI
-        mock_ai.generate_brief.assert_called_once()
+        mock_ai.generate_daily_brief.assert_called_once()
 
         # Old insight should be gone
         insights = db.query(Insight).filter(

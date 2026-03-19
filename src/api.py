@@ -4,6 +4,7 @@ LifeOS API Server
 FastAPI application with modular routers.
 """
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -124,7 +125,15 @@ TAGS_METADATA = [
     },
 ]
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: init on startup."""
+    init_db()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="LifeOS",
     description=DESCRIPTION,
     version="0.1.0",
@@ -142,7 +151,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -165,14 +174,6 @@ app.include_router(voice_router)
 app.include_router(onboarding_router)
 app.include_router(journal_router)
 app.include_router(goals_router)
-
-
-# === Startup ===
-
-@app.on_event("startup")
-async def startup():
-    """Initialize database on startup."""
-    init_db()
 
 
 # === Static Files & Frontend ===

@@ -2,7 +2,7 @@
 User settings endpoints.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -100,7 +100,7 @@ async def update_settings(
         prefs['quiet_hours_end'] = request.quiet_hours_end
 
     user.preferences = prefs
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(user)

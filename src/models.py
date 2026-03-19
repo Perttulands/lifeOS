@@ -4,7 +4,7 @@ LifeOS Data Models
 SQLAlchemy models for all LifeOS data.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import json
 
@@ -22,8 +22,8 @@ class User(Base):
     name = Column(String(100), nullable=False, default="User")
     timezone = Column(String(50), default="UTC")
     preferences = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class DataPoint(Base):
@@ -42,7 +42,7 @@ class DataPoint(Base):
     date = Column(String(10), nullable=False)    # YYYY-MM-DD
     value = Column(Float)                        # Primary numeric value
     extra_data = Column("metadata", JSON, default=dict)  # Additional data (column name 'metadata' in DB)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_datapoint_date_type', 'date', 'type'),
@@ -66,7 +66,7 @@ class Insight(Base):
     context = Column(JSON, default=dict)         # Input data used to generate
     confidence = Column(Float, default=0.0)      # Confidence score 0-1
     acted_on = Column(Boolean, default=False)    # User marked as useful
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_insight_date_type', 'date', 'type'),
@@ -92,8 +92,8 @@ class Pattern(Base):
     confidence = Column(Float, default=0.0)      # Statistical confidence
     actionable = Column(Boolean, default=True)   # Is this actionable?
     active = Column(Boolean, default=True)       # Still relevant?
-    discovered_at = Column(DateTime, default=datetime.utcnow)
-    last_validated = Column(DateTime, default=datetime.utcnow)
+    discovered_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_validated = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_pattern_type', 'pattern_type'),
@@ -112,7 +112,7 @@ class JournalEntry(Base):
     mood = Column(Integer)                       # 1-5 scale
     notes = Column(Text)
     tags = Column(JSON, default=list)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_journal_date', 'date'),
@@ -151,8 +151,8 @@ class Goal(Base):
     tags = Column(JSON, default=list)
 
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_goal_status', 'status'),
@@ -192,8 +192,8 @@ class Milestone(Base):
     source = Column(String(20), default="ai")     # ai, manual
 
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_milestone_goal', 'goal_id'),
@@ -216,8 +216,8 @@ class Task(Base):
     source = Column(String(50), default="manual")  # manual, telegram, discord, voice
     raw_input = Column(Text)  # Original captured text
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_task_status', 'status'),
@@ -237,7 +237,7 @@ class Note(Base):
     source = Column(String(50), default="manual")  # manual, telegram, discord, voice
     raw_input = Column(Text)  # Original captured text
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_note_created', 'created_at'),
@@ -257,8 +257,8 @@ class OAuthToken(Base):
     expires_at = Column(DateTime)
     scope = Column(Text)  # Comma-separated scopes
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_oauth_provider_user', 'provider', 'user_id'),
@@ -285,7 +285,7 @@ class CalendarEvent(Base):
     is_recurring = Column(Boolean, default=False)
     recurring_event_id = Column(String(200))  # Parent recurring event ID
     extra_data = Column("metadata", JSON, default=dict)
-    synced_at = Column(DateTime, default=datetime.utcnow)
+    synced_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_calendar_event_id', 'event_id'),
@@ -317,9 +317,9 @@ class UserPreference(Base):
     weight = Column(Float, default=0.5)            # confidence 0-1 (higher = more certain)
     source = Column(String(20), default="inferred")  # explicit, inferred, feedback
     evidence_count = Column(Integer, default=1)    # number of supporting observations
-    last_reinforced = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_reinforced = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_preference_user_category', 'user_id', 'category'),
@@ -340,7 +340,7 @@ class InsightFeedback(Base):
     insight_id = Column(Integer, nullable=False)   # Reference to insights table
     feedback_type = Column(String(20), nullable=False)  # helpful, not_helpful, acted_on, dismissed
     context = Column(JSON, default=dict)           # Additional context (time to read, etc.)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_feedback_insight', 'insight_id'),
@@ -379,8 +379,8 @@ class VoiceNote(Base):
     # Metadata
     source = Column(String(50), default="upload")      # upload, telegram, discord
     extra_data = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index('idx_voice_note_status', 'transcription_status'),

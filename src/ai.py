@@ -4,11 +4,14 @@ LifeOS AI Engine
 LiteLLM-powered intelligence for insights, briefs, and pattern detection.
 """
 
+import logging
 import os
 import json
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
+
+logger = logging.getLogger(__name__)
 
 from litellm import completion
 from litellm.exceptions import APIError
@@ -505,8 +508,7 @@ Return as JSON array:
                     for p in patterns_json
                 ]
         except (json.JSONDecodeError, ValueError) as e:
-            # If JSON parsing fails, return empty list
-            pass
+            logger.warning(f"Failed to parse AI response: {e}")
 
         return []
 
@@ -572,8 +574,8 @@ Predict my energy for today. Return JSON:
             end = content.rfind('}') + 1
             if start >= 0 and end > start:
                 return json.loads(content[start:end])
-        except:
-            pass
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.warning(f"Failed to parse AI response: {e}")
 
         # Default prediction
         return {
