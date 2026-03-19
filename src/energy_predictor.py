@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, date, timedelta
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -90,6 +91,7 @@ class EnergyPredictor:
 
     VERSION = "1.1"  # Updated for meeting density feature
     MIN_TRAINING_SAMPLES = 7
+    WEIGHTS_FILE = Path(__file__).parent.parent / "data" / "model_weights.json"
 
     # Feature names in order
     FEATURE_NAMES = [
@@ -287,13 +289,41 @@ class EnergyPredictor:
             np.abs(self._coefficients).tolist()
         ))
 
-        return {
+        metrics = {
             "sample_count": len(y),
             "r_squared": self._training_r_squared,
             "feature_importance": feature_importance,
             "intercept": self._intercept,
             "coefficients": dict(zip(self.FEATURE_NAMES, self._coefficients.tolist()))
         }
+
+        self.save_weights()
+        return metrics
+
+    def save_weights(self):
+        """Save trained model weights to file."""
+        if not self._is_trained:
+            return
+
+        params = self.get_model_params()
+        if params is None:
+            return
+
+        self.WEIGHTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.WEIGHTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(params, f, indent=2)
+
+    def load_weights(self) -> bool:
+        """Load model weights from file. Returns True if loaded."""
+        if not self.WEIGHTS_FILE.exists():
+            return False
+
+        try:
+            with open(self.WEIGHTS_FILE, encoding="utf-8") as f:
+                params = json.load(f)
+            return self.load_model_params(params)
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            return False
 
     def predict(
         self,
@@ -605,6 +635,7 @@ def get_energy_predictor() -> EnergyPredictor:
     global _predictor
     if _predictor is None:
         _predictor = EnergyPredictor()
+        _predictor.load_weights()
     return _predictor
 
 

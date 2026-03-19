@@ -85,7 +85,7 @@ class TestEnergyPredictor:
         """Test predictor initialization."""
         assert predictor is not None
         assert not predictor.is_trained
-        assert predictor.VERSION == "1.0"
+        assert predictor.VERSION == "1.1"
 
     def test_prepare_training_data(self, predictor, training_data):
         """Test training data preparation."""
@@ -95,8 +95,8 @@ class TestEnergyPredictor:
         assert prepared is not None
         assert isinstance(prepared, TrainingData)
         assert prepared.sample_count >= 7
-        assert len(prepared.feature_names) == 5
-        assert prepared.features.shape[1] == 5  # 5 features
+        assert len(prepared.feature_names) == 6
+        assert prepared.features.shape[1] == 6
 
     def test_prepare_training_data_insufficient(self, predictor):
         """Test with insufficient data."""
@@ -204,6 +204,43 @@ class TestEnergyPredictor:
         pred2 = new_predictor.predict(7.5, 1.5, 75, 1, 5.0)
 
         assert pred1.predicted_energy == pred2.predicted_energy
+
+    def test_weights_file_persistence(self, training_data, tmp_path):
+        """Test saving and loading persisted model weights from disk."""
+        data_points, journal_entries = training_data
+        prepared = EnergyPredictor().prepare_training_data(data_points, journal_entries)
+
+        assert prepared is not None
+
+        weights_file = tmp_path / "model_weights.json"
+        predictor = EnergyPredictor()
+        predictor.WEIGHTS_FILE = weights_file
+        predictor.train(prepared)
+
+        assert weights_file.exists()
+
+        loaded_predictor = EnergyPredictor()
+        loaded_predictor.WEIGHTS_FILE = weights_file
+
+        assert loaded_predictor.load_weights()
+        assert loaded_predictor.is_trained
+
+        features = {
+            "sleep_duration": 7.5,
+            "deep_sleep": 1.5,
+            "readiness_score": 75,
+            "day_of_week": 1,
+            "prev_day_energy": 5.0,
+            "meeting_hours": 0.0,
+        }
+        pred1 = predictor.predict(**features)
+        pred2 = loaded_predictor.predict(**features)
+
+        assert pred1.predicted_energy == pred2.predicted_energy
+        assert pred1.confidence == pred2.confidence
+
+        weights_file.unlink()
+        assert not weights_file.exists()
 
 
 class TestPredictionComparator:

@@ -29,6 +29,7 @@ env/
 # Database
 *.db
 *.sqlite3
+data/model_weights.json
 
 # IDE
 .idea/
@@ -48,3 +49,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# bv (beads viewer) local config and caches
+.bv/
