@@ -249,5 +249,145 @@ def sync(source, days):
         sys.exit(2)
 
 
+@cli.group()
+def quest():
+    """Manage quests and XP."""
+    pass
+
+
+@quest.command("board")
+def quest_board():
+    """Show the quest board."""
+    from .sidekick import load_state, get_quest_board
+    state = load_state()
+    click.echo(get_quest_board(state))
+
+
+@quest.command("add")
+@click.argument("title")
+@click.option("--type", "qtype", type=click.Choice(["daily", "weekly", "epic"]), default="daily")
+@click.option("--xp", type=int, default=None)
+@click.option("--tag", multiple=True)
+@click.option("--epic", "parent_epic", default=None, help="Parent epic quest ID")
+def quest_add(title, qtype, xp, tag, parent_epic):
+    """Add a quest."""
+    from .sidekick import load_state, save_state, add_quest
+    state = load_state()
+    state, qid = add_quest(state, title, qtype, xp=xp, tags=list(tag), parent_epic=parent_epic)
+    save_state(state)
+    click.echo(f"Quest added: {qid} — {title} (+{xp or '?'}xp)")
+
+
+@quest.command("done")
+@click.argument("quest_id")
+def quest_done(quest_id):
+    """Complete a quest."""
+    from .sidekick import load_state, save_state, complete_quest, get_level
+    state = load_state()
+    old_xp = state["player"]["xp"]
+    state = complete_quest(state, quest_id)
+    new_xp = state["player"]["xp"]
+    save_state(state)
+    gained = new_xp - old_xp
+    level, title, _ = get_level(new_xp)
+    click.echo(f"✅ Quest complete! +{gained}xp → {new_xp}xp (Lv.{level} {title})")
+
+
+@quest.command("list")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def quest_list(fmt):
+    """List active quests."""
+    from .sidekick import load_state, get_active_quests
+    from .formatters import format_json
+    state = load_state()
+    active = get_active_quests(state)
+    if fmt == "json":
+        click.echo(format_json({"player": state["player"], "active_quests": active}))
+    else:
+        if not active:
+            click.echo("No active quests.")
+            return
+        for qtype, quests in active.items():
+            click.echo(f"\n{qtype.upper()}:")
+            for q in quests:
+                click.echo(f"  [{q['id']}] {q['title']} (+{q['xp']}xp)")
+
+
+@quest.command("state")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="json")
+def quest_state(fmt):
+    """Full sidekick state dump."""
+    from .sidekick import load_state
+    from .formatters import format_json
+    state = load_state()
+    if fmt == "json":
+        click.echo(format_json(state))
+    else:
+        p = state["player"]
+        click.echo(f"{p['name']} — Lv.{p['level']} {p['title']} ({p['xp']}xp)")
+        click.echo(f"Streaks: {p['streaks']}")
+        click.echo(f"History: {len(state['history'])} events")
+
+
+@cli.command()
+@click.argument("entry_type", type=click.Choice(["energy", "mood", "note"]))
+@click.argument("value")
+@click.option("--note", default=None)
+def log(entry_type, value, note):
+    """Log energy, mood, or a note."""
+    from .formatters import format_error
+    from .sidekick import load_state, save_state, award_xp
+
+    try:
+        from datetime import datetime, timezone as tz
+        from ..database import SessionLocal, init_db
+        from ..models import JournalEntry
+        init_db()
+        db = SessionLocal()
+        try:
+            today = datetime.now(tz.utc).strftime("%Y-%m-%d")
+            now_time = datetime.now(tz.utc).strftime("%H:%M")
+
+            if entry_type == "energy":
+                val = int(value)
+                if not 1 <= val <= 5:
+                    click.echo("Energy must be 1-5", err=True)
+                    sys.exit(1)
+                entry = JournalEntry(date=today, time=now_time, energy=val, notes=note)
+                db.add(entry)
+                db.commit()
+                # XP for logging
+                state = load_state()
+                state = award_xp(state, 5, f"Logged energy: {val}/5")
+                save_state(state)
+                click.echo(f"🔋 Energy logged: {val}/5 (+5xp)")
+
+            elif entry_type == "mood":
+                val = int(value)
+                if not 1 <= val <= 5:
+                    click.echo("Mood must be 1-5", err=True)
+                    sys.exit(1)
+                entry = JournalEntry(date=today, time=now_time, mood=val, notes=note)
+                db.add(entry)
+                db.commit()
+                state = load_state()
+                state = award_xp(state, 5, f"Logged mood: {val}/5")
+                save_state(state)
+                click.echo(f"😊 Mood logged: {val}/5 (+5xp)")
+
+            elif entry_type == "note":
+                from ..models import Note
+                n = Note(content=value, source="cli", raw_input=value)
+                db.add(n)
+                db.commit()
+                click.echo(f"📝 Note saved: {value[:50]}")
+
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
 if __name__ == "__main__":
     cli()
