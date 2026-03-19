@@ -5,7 +5,7 @@ Tests preference management, learning algorithms, and personalization context bu
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from src.personalization import PersonalizationService, PreferenceContext
@@ -291,7 +291,7 @@ class TestDecayPreferences:
             source="inferred"
         )
         # Set last_reinforced to old date
-        pref.last_reinforced = datetime.utcnow() - timedelta(days=30)
+        pref.last_reinforced = datetime.now(timezone.utc) - timedelta(days=30)
         db.commit()
 
         service = PersonalizationService(db)
@@ -310,7 +310,7 @@ class TestDecayPreferences:
             weight=0.8,
             source="inferred"
         )
-        pref.last_reinforced = datetime.utcnow()
+        pref.last_reinforced = datetime.now(timezone.utc)
         db.commit()
 
         service = PersonalizationService(db)
@@ -329,7 +329,7 @@ class TestDecayPreferences:
             weight=1.0,
             source="explicit"
         )
-        pref.last_reinforced = datetime.utcnow() - timedelta(days=60)
+        pref.last_reinforced = datetime.now(timezone.utc) - timedelta(days=60)
         db.commit()
 
         service = PersonalizationService(db)
