@@ -40,6 +40,20 @@ XP_VALUES = {
     "quest_chain_complete": 50,  # bonus for finishing all steps in an epic
 }
 
+ACHIEVEMENTS = {
+    "first_brief": {"title": "First Brief", "desc": "Received your first morning brief", "xp": 25},
+    "week_streak_3": {"title": "On Fire", "desc": "3-day quest streak", "xp": 25},
+    "week_streak_7": {"title": "Unstoppable", "desc": "7-day quest streak", "xp": 50},
+    "sleep_champion": {"title": "Sleep Champion", "desc": "Sleep score >90 for 3 consecutive days", "xp": 50},
+    "early_bird": {"title": "Early Bird", "desc": "Logged energy before 9am for 5 days", "xp": 30},
+    "quest_machine": {"title": "Quest Machine", "desc": "Completed 10 quests", "xp": 50},
+    "level_up_first": {"title": "Level Up!", "desc": "Reached Level 2", "xp": 0},
+    "epic_slayer": {"title": "Epic Slayer", "desc": "Completed your first epic quest", "xp": 100},
+    "data_nerd": {"title": "Data Nerd", "desc": "Logged energy 14 days in a row", "xp": 75},
+    "century": {"title": "Century", "desc": "Reached 100 total XP", "xp": 0},
+    "perfect_week": {"title": "Perfect Week", "desc": "Week score above 85", "xp": 100},
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -74,6 +88,7 @@ def _default_state() -> Dict[str, Any]:
             "title": "Rookie Parent",
             "streaks": {"daily_quest": 0, "energy_log": 0, "brief_read": 0},
             "longest_streaks": {"daily_quest": 0, "energy_log": 0, "brief_read": 0},
+            "achievements": [],
         },
         "quests": {"daily": [], "weekly": [], "epic": []},
         "history": [],
@@ -153,6 +168,7 @@ def complete_quest(state: Dict, quest_id: str) -> Dict:
                 # Check if all children of parent epic are done
                 if quest.get("parent_epic"):
                     _check_epic_chain(state, quest["parent_epic"])
+                check_achievements(state)
                 return state
     return state
 
@@ -277,6 +293,89 @@ def get_quest_board(state: Dict) -> str:
     else:
         lines.append("\n*No active quests. Tell Hermes what you need to get done.*")
 
+    return "\n".join(lines)
+
+
+def check_achievements(state: Dict, week_score: Optional[float] = None) -> List[str]:
+    """Scan for newly unlocked achievements. Awards XP for each. Returns list of unlocked IDs."""
+    unlocked = state["player"].get("achievements", [])
+    newly_unlocked = []
+
+    def _unlock(aid: str):
+        if aid not in unlocked:
+            unlocked.append(aid)
+            xp = ACHIEVEMENTS[aid]["xp"]
+            if xp > 0:
+                award_xp(state, xp, f"Achievement: {ACHIEVEMENTS[aid]['title']}")
+            state["history"].append({
+                "date": _today(),
+                "event": "achievement_unlocked",
+                "xp": xp,
+                "note": f"Unlocked: {ACHIEVEMENTS[aid]['title']}",
+                "timestamp": _now(),
+            })
+            newly_unlocked.append(aid)
+
+    # first_brief — check history for brief_read streak > 0
+    if state["player"]["streaks"].get("brief_read", 0) >= 1:
+        _unlock("first_brief")
+
+    # century — 100+ XP
+    if state["player"]["xp"] >= 100:
+        _unlock("century")
+
+    # level_up_first — level >= 2
+    if state["player"]["level"] >= 2:
+        _unlock("level_up_first")
+
+    # week_streak_3
+    if state["player"]["streaks"].get("daily_quest", 0) >= 3:
+        _unlock("week_streak_3")
+
+    # week_streak_7
+    if state["player"]["streaks"].get("daily_quest", 0) >= 7:
+        _unlock("week_streak_7")
+
+    # quest_machine — 10 completed quests total
+    completed_count = sum(
+        1 for qtype in ["daily", "weekly", "epic"]
+        for q in state["quests"][qtype]
+        if q["status"] == "completed"
+    )
+    if completed_count >= 10:
+        _unlock("quest_machine")
+
+    # epic_slayer — completed an epic
+    epic_completed = any(
+        q["status"] == "completed" for q in state["quests"].get("epic", [])
+    )
+    if epic_completed:
+        _unlock("epic_slayer")
+
+    # data_nerd — energy_log streak >= 14
+    if state["player"]["streaks"].get("energy_log", 0) >= 14:
+        _unlock("data_nerd")
+
+    # perfect_week — week_score > 85
+    if week_score is not None and week_score > 85:
+        _unlock("perfect_week")
+
+    state["player"]["achievements"] = unlocked
+    return newly_unlocked
+
+
+def get_achievements_display(state: Dict) -> str:
+    """Render achievements as text."""
+    unlocked = set(state["player"].get("achievements", []))
+    lines = ["Achievements:"]
+    for aid, info in ACHIEVEMENTS.items():
+        if aid in unlocked:
+            lines.append(f"  [x] {info['title']} — {info['desc']} (+{info['xp']}xp)")
+        else:
+            lines.append(f"  [ ] {info['title']} — {info['desc']}")
+    earned = len(unlocked)
+    total = len(ACHIEVEMENTS)
+    lines.append(f"\n{earned}/{total} unlocked")
     return "\n".join(lines)
 
 

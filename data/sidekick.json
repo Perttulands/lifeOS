@@ -1,90 +1,38 @@
 {
   "player": {
     "name": "Perttu",
-    "xp": 40,
+    "xp": 65,
     "level": 1,
     "title": "Rookie Parent",
     "streaks": {
       "daily_quest": 0,
-      "energy_log": 0,
+      "energy_log": 1,
       "brief_read": 1
     },
     "longest_streaks": {
       "daily_quest": 0,
-      "energy_log": 0,
+      "energy_log": 1,
       "brief_read": 1
-    }
+    },
+    "achievements": [
+      "first_brief"
+    ]
   },
   "quests": {
-    "daily": [
-      {
-        "id": "b384ee30",
-        "title": "Set up baby monitor",
-        "type": "daily",
-        "xp": 15,
-        "status": "active",
-        "created": "2026-03-19T18:16:21.771389+00:00",
-        "completed": null,
-        "parent_epic": null,
-        "tags": [
-          "baby-prep"
-        ]
-      },
-      {
-        "id": "25564960",
-        "title": "Research stroller options",
-        "type": "daily",
-        "xp": 15,
-        "status": "active",
-        "created": "2026-03-19T18:16:21.802339+00:00",
-        "completed": null,
-        "parent_epic": null,
-        "tags": [
-          "baby-prep"
-        ]
-      },
-      {
-        "id": "81192c52",
-        "title": "Morning walk \u2014 20 min minimum",
-        "type": "daily",
-        "xp": 10,
-        "status": "active",
-        "created": "2026-03-19T18:16:21.832819+00:00",
-        "completed": null,
-        "parent_epic": null,
-        "tags": [
-          "health"
-        ]
-      }
-    ],
-    "weekly": [
-      {
-        "id": "b2b63d37",
-        "title": "LifeOS Sprint 2 \u2014 log commands working",
-        "type": "weekly",
-        "xp": 75,
-        "status": "active",
-        "created": "2026-03-19T18:16:21.891516+00:00",
-        "completed": null,
-        "parent_epic": null,
-        "tags": [
-          "polis"
-        ]
-      }
-    ],
+    "daily": [],
+    "weekly": [],
     "epic": [
       {
-        "id": "803ea452",
-        "title": "Nursery ready for baby",
+        "id": "e6c20a48",
+        "title": "Goal: Get nursery ready",
         "type": "epic",
         "xp": 300,
         "status": "active",
-        "created": "2026-03-19T18:16:21.862209+00:00",
+        "created": "2026-03-20T06:49:06.438217+00:00",
         "completed": null,
         "parent_epic": null,
         "tags": [
-          "baby-prep",
-          "nursery"
+          "baby-prep"
         ]
       }
     ]
@@ -92,29 +40,32 @@
   "history": [
     {
       "date": "2026-03-19",
-      "event": "first_brief_received",
-      "xp": 10,
-      "note": "First LifeOS morning brief delivered and read"
-    },
-    {
-      "date": "2026-03-19",
-      "event": "oura_bonus",
-      "xp": 10,
-      "note": "Readiness 85 \u2014 above 80 threshold"
-    },
-    {
-      "date": "2026-03-19",
-      "event": "system_built",
-      "xp": 15,
-      "note": "Provided Oura token, activated LifeOS"
+      "event": "system_activated",
+      "xp": 35,
+      "note": "LifeOS activated \u2014 first brief, Oura connected, sidekick initialized",
+      "timestamp": "2026-03-19T18:12:00+00:00"
     },
     {
       "date": "2026-03-19",
       "event": "xp_awarded",
       "xp": 5,
       "note": "Logged energy: 4/5",
-      "timestamp": "2026-03-19T18:16:22.127648+00:00"
+      "timestamp": "2026-03-19T18:14:00+00:00"
+    },
+    {
+      "date": "2026-03-20",
+      "event": "xp_awarded",
+      "xp": 25,
+      "note": "Achievement: First Brief",
+      "timestamp": "2026-03-20T05:21:33.046117+00:00"
+    },
+    {
+      "date": "2026-03-20",
+      "event": "achievement_unlocked",
+      "xp": 25,
+      "note": "Unlocked: First Brief",
+      "timestamp": "2026-03-20T05:21:33.046129+00:00"
     }
   ],
-  "last_updated": "2026-03-19T18:16:22.127656+00:00"
+  "last_updated": "2026-03-20T06:49:06.977509+00:00"
 }

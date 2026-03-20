@@ -61,7 +61,7 @@ def brief(date, days, fmt):
 
             # Compute averages from history
             sleep_vals = [h["sleep"]["value"] for h in history if "sleep" in h and h["sleep"].get("value")]
-            deep_vals = [h["sleep"].get("deep_sleep_hours", 0) for h in history if "sleep" in h]
+            deep_vals = [h["sleep"].get("deep_sleep_hours") or 0 for h in history if "sleep" in h]
             readiness_vals = [h["readiness"]["value"] for h in history if "readiness" in h and h["readiness"].get("value")]
 
             averages = {}

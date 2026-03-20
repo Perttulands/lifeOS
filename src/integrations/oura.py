@@ -236,6 +236,30 @@ class OuraClient:
             return response.get("data", [])
         return None
 
+    def get_sleep_periods(
+        self,
+        start_date: str,
+        end_date: Optional[str] = None
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get individual sleep period data (durations, HR, HRV).
+
+        Args:
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD), defaults to start_date
+
+        Returns:
+            List of sleep period records or None on error
+        """
+        params = {"start_date": start_date}
+        if end_date:
+            params["end_date"] = end_date
+
+        response = self._request("GET", "/usercollection/sleep", params)
+        if response:
+            return response.get("data", [])
+        return None
+
     def get_daily_readiness(
         self,
         start_date: str,
@@ -285,26 +309,39 @@ class OuraSyncService:
         self.db = db
         self.client = client or OuraClient()
 
-    def _transform_sleep(self, data: Dict[str, Any]) -> DataPoint:
-        """Transform Oura sleep data to DataPoint."""
-        # Extract key metrics
-        contributors = data.get("contributors", {})
+    def _transform_sleep(self, daily: Dict[str, Any], period: Optional[Dict[str, Any]] = None) -> DataPoint:
+        """Transform Oura sleep data to DataPoint.
+
+        Args:
+            daily: Daily sleep summary (score, contributors)
+            period: Sleep period data (durations, HR, HRV) — optional
+        """
+        period = period or {}
+
+        # Total sleep hours: prefer period data, fall back to daily summary
+        total_seconds = period.get("total_sleep_duration") or daily.get("total_sleep_duration") or 0
+        total_hours = round(total_seconds / 3600, 2) if total_seconds else None
+
+        # Convert duration fields from seconds to hours
+        def _sec_to_hours(val):
+            return round(val / 3600, 2) if val else None
 
         return DataPoint(
             source="oura",
             type="sleep",
-            date=data.get("day", ""),
-            value=data.get("score"),  # Overall sleep score
+            date=daily.get("day", ""),
+            value=total_hours,  # HOURS, not score
             extra_data={
-                "total_sleep_duration": data.get("total_sleep_duration"),  # seconds
-                "deep_sleep_duration": contributors.get("deep_sleep"),
-                "rem_sleep_duration": contributors.get("rem_sleep"),
-                "light_sleep_duration": contributors.get("light_sleep"),
-                "efficiency": contributors.get("efficiency"),
-                "latency": contributors.get("latency"),
-                "restfulness": contributors.get("restfulness"),
-                "timing": contributors.get("timing"),
-                "timestamp": data.get("timestamp"),
+                "score": daily.get("score"),
+                "deep_sleep_hours": _sec_to_hours(period.get("deep_sleep_duration")),
+                "rem_sleep_hours": _sec_to_hours(period.get("rem_sleep_duration")),
+                "light_sleep_hours": _sec_to_hours(period.get("light_sleep_duration")),
+                "efficiency": round(period["efficiency"] / 100, 2) if period.get("efficiency") else None,
+                "bedtime": period.get("bedtime_start"),
+                "wake_time": period.get("bedtime_end"),
+                "hr_lowest": period.get("lowest_heart_rate") or period.get("hr_lowest"),
+                "hrv_average": period.get("average_hrv"),
+                "timestamp": daily.get("timestamp"),
             }
         )
 
@@ -396,6 +433,9 @@ class OuraSyncService:
         """
         Sync sleep data from Oura.
 
+        Fetches both daily summaries (scores) and sleep periods (durations,
+        HR, HRV) and merges them by day.
+
         Args:
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
@@ -415,11 +455,23 @@ class OuraSyncService:
                 errors=["Failed to fetch sleep data from Oura API"]
             )
 
+        # Fetch sleep periods for durations/HR/HRV (non-fatal if unavailable)
+        periods = self.client.get_sleep_periods(start_date, end_date)
+        periods_by_day: Dict[str, Dict[str, Any]] = {}
+        if periods:
+            for p in periods:
+                day = p.get("day", "")
+                # Prefer long_sleep over naps; first long_sleep wins
+                if p.get("type") == "long_sleep" or day not in periods_by_day:
+                    periods_by_day[day] = p
+
         synced = 0
         errors = []
 
         for record in data:
-            dp = self._transform_sleep(record)
+            day = record.get("day", "")
+            period = periods_by_day.get(day)
+            dp = self._transform_sleep(record, period)
             if self._upsert_datapoint(dp):
                 synced += 1
             else:

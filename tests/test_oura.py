@@ -38,7 +38,7 @@ def db():
 
 @pytest.fixture
 def mock_sleep_response():
-    """Sample Oura sleep API response."""
+    """Sample Oura daily_sleep API response (scores + summary)."""
     return {
         "data": [
             {
@@ -56,6 +56,29 @@ def mock_sleep_response():
                     "restfulness": 80,
                     "timing": 75,
                 }
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def mock_sleep_periods_response():
+    """Sample Oura sleep periods API response (durations, HR, HRV)."""
+    return {
+        "data": [
+            {
+                "id": "period_001",
+                "day": "2026-02-03",
+                "type": "long_sleep",
+                "bedtime_start": "2026-02-02T23:00:00+00:00",
+                "bedtime_end": "2026-02-03T07:00:00+00:00",
+                "total_sleep_duration": 28800,  # 8 hours
+                "deep_sleep_duration": 5400,    # 1.5 hours
+                "rem_sleep_duration": 7200,     # 2.0 hours
+                "light_sleep_duration": 14400,  # 4.0 hours
+                "efficiency": 92,
+                "lowest_heart_rate": 48,
+                "average_hrv": 45,
             }
         ]
     }
@@ -272,10 +295,13 @@ class TestOuraSyncService:
     """Tests for OuraSyncService database operations."""
 
     @respx.mock
-    def test_sync_sleep_creates_datapoint(self, db, mock_sleep_response):
-        """Test that syncing sleep data creates DataPoint records."""
+    def test_sync_sleep_creates_datapoint(self, db, mock_sleep_response, mock_sleep_periods_response):
+        """Test that syncing sleep data creates DataPoint with hours in value and score in extra_data."""
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=mock_sleep_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=mock_sleep_periods_response)
         )
 
         service = OuraSyncService(db, OuraClient(access_token="test"))
@@ -293,8 +319,16 @@ class TestOuraSyncService:
         ).first()
 
         assert dp is not None
-        assert dp.value == 85
-        assert dp.extra_data["total_sleep_duration"] == 28800
+        assert dp.value == 8.0  # hours, not score
+        assert dp.extra_data["score"] == 85
+        assert dp.extra_data["deep_sleep_hours"] == 1.5
+        assert dp.extra_data["rem_sleep_hours"] == 2.0
+        assert dp.extra_data["light_sleep_hours"] == 4.0
+        assert dp.extra_data["efficiency"] == 0.92
+        assert dp.extra_data["hr_lowest"] == 48
+        assert dp.extra_data["hrv_average"] == 45
+        assert dp.extra_data["bedtime"] == "2026-02-02T23:00:00+00:00"
+        assert dp.extra_data["wake_time"] == "2026-02-03T07:00:00+00:00"
 
     @respx.mock
     def test_sync_activity_creates_datapoint(self, db, mock_activity_response):
@@ -342,10 +376,13 @@ class TestOuraSyncService:
         assert dp.value == 82
 
     @respx.mock
-    def test_upsert_updates_existing(self, db, mock_sleep_response):
+    def test_upsert_updates_existing(self, db, mock_sleep_response, mock_sleep_periods_response):
         """Test that re-syncing updates existing records rather than duplicating."""
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=mock_sleep_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=mock_sleep_periods_response)
         )
 
         service = OuraSyncService(db, OuraClient(access_token="test"))
@@ -354,12 +391,18 @@ class TestOuraSyncService:
         result1 = service.sync_sleep("2026-02-03")
         assert result1.records_synced == 1
 
-        # Modify mock response score
+        # Modify mock response — different total duration
         updated_response = {
             "data": [{**mock_sleep_response["data"][0], "score": 90}]
         }
+        updated_periods = {
+            "data": [{**mock_sleep_periods_response["data"][0], "total_sleep_duration": 25200}]  # 7 hours
+        }
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=updated_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=updated_periods)
         )
 
         # Second sync should update, not duplicate
@@ -374,21 +417,25 @@ class TestOuraSyncService:
         ).count()
         assert count == 1
 
-        # Score should be updated
+        # Value (hours) and score should be updated
         dp = db.query(DataPoint).filter(
             DataPoint.source == "oura",
             DataPoint.type == "sleep",
             DataPoint.date == "2026-02-03"
         ).first()
-        assert dp.value == 90
+        assert dp.value == 7.0  # updated hours
+        assert dp.extra_data["score"] == 90  # updated score
 
     @respx.mock
     def test_sync_all_returns_three_results(
-        self, db, mock_sleep_response, mock_activity_response, mock_readiness_response
+        self, db, mock_sleep_response, mock_sleep_periods_response, mock_activity_response, mock_readiness_response
     ):
         """Test that sync_all syncs all three data types."""
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=mock_sleep_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=mock_sleep_periods_response)
         )
         respx.get("https://api.ouraring.com/v2/usercollection/daily_activity").mock(
             return_value=httpx.Response(200, json=mock_activity_response)
@@ -403,6 +450,32 @@ class TestOuraSyncService:
         assert len(results) == 3
         assert all(r.success for r in results)
         assert sum(r.records_synced for r in results) == 3
+
+    @respx.mock
+    def test_sync_sleep_without_periods_falls_back(self, db, mock_sleep_response):
+        """Test that sleep sync works even if periods endpoint fails."""
+        respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
+            return_value=httpx.Response(200, json=mock_sleep_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(500, json={"error": "Server error"})
+        )
+
+        service = OuraSyncService(db, OuraClient(access_token="test"))
+        result = service.sync_sleep("2026-02-03")
+
+        assert result.success
+        dp = db.query(DataPoint).filter(
+            DataPoint.source == "oura",
+            DataPoint.type == "sleep",
+            DataPoint.date == "2026-02-03"
+        ).first()
+
+        # Falls back to total_sleep_duration from daily_sleep
+        assert dp.value == 8.0  # 28800 / 3600
+        assert dp.extra_data["score"] == 85
+        # No period data available
+        assert dp.extra_data["deep_sleep_hours"] is None
 
     @respx.mock
     def test_api_failure_returns_error_result(self, db):
@@ -420,12 +493,16 @@ class TestOuraSyncService:
 
     @respx.mock
     def test_backfill_syncs_multiple_days(
-        self, db, mock_sleep_response, mock_activity_response, mock_readiness_response
+        self, db, mock_sleep_response, mock_sleep_periods_response, mock_activity_response, mock_readiness_response
     ):
         """Test that backfill syncs data for multiple days."""
         # Mock responses for 7 days
         multi_sleep = {"data": [
             {**mock_sleep_response["data"][0], "day": (date.today() - timedelta(days=i)).isoformat()}
+            for i in range(7)
+        ]}
+        multi_periods = {"data": [
+            {**mock_sleep_periods_response["data"][0], "day": (date.today() - timedelta(days=i)).isoformat()}
             for i in range(7)
         ]}
         multi_activity = {"data": [
@@ -439,6 +516,9 @@ class TestOuraSyncService:
 
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=multi_sleep)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=multi_periods)
         )
         respx.get("https://api.ouraring.com/v2/usercollection/daily_activity").mock(
             return_value=httpx.Response(200, json=multi_activity)
@@ -490,16 +570,20 @@ class TestSyncOuraDataFunction:
 
     @respx.mock
     def test_sync_oura_data_defaults_to_today(
-        self, db, mock_sleep_response, mock_activity_response, mock_readiness_response
+        self, db, mock_sleep_response, mock_sleep_periods_response, mock_activity_response, mock_readiness_response
     ):
         """Test that sync_oura_data syncs today by default."""
         today = date.today().isoformat()
         mock_sleep_response["data"][0]["day"] = today
+        mock_sleep_periods_response["data"][0]["day"] = today
         mock_activity_response["data"][0]["day"] = today
         mock_readiness_response["data"][0]["day"] = today
 
         respx.get("https://api.ouraring.com/v2/usercollection/daily_sleep").mock(
             return_value=httpx.Response(200, json=mock_sleep_response)
+        )
+        respx.get("https://api.ouraring.com/v2/usercollection/sleep").mock(
+            return_value=httpx.Response(200, json=mock_sleep_periods_response)
         )
         respx.get("https://api.ouraring.com/v2/usercollection/daily_activity").mock(
             return_value=httpx.Response(200, json=mock_activity_response)
