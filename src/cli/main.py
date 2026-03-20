@@ -143,11 +143,12 @@ def brief(date, days, fmt):
                 lines = [f"📅 {day_name} {target_date}"]
                 if sleep.get("value"):
                     avg = averages.get("sleep_hours_avg", "?")
-                    lines.append(f"💤 Sleep: {sleep['value']:.1f}h (avg: {avg}h)")
+                    score_str = f" (score: {sleep['score']}/100)" if sleep.get("score") else ""
+                    lines.append(f"💤 Sleep: {sleep['value']:.1f}h{score_str} (avg: {avg}h)")
                     if sleep.get("deep_sleep_hours"):
-                        lines.append(f"   Deep: {sleep['deep_sleep_hours']:.1f}h | REM: {sleep.get('rem_sleep_hours', 0):.1f}h")
-                    if sleep.get("score"):
-                        lines.append(f"   Score: {sleep['score']}/100")
+                        lines.append(f"   Deep: {sleep['deep_sleep_hours']:.1f}h | REM: {sleep.get('rem_sleep_hours', 0):.1f}h | Light: {sleep.get('light_sleep_hours', 0):.1f}h")
+                    if sleep.get("hrv_average"):
+                        lines.append(f"   HRV: {sleep['hrv_average']} avg | Resting HR: {sleep.get('hr_lowest', '?')}")
                 if readiness.get("value"):
                     lines.append(f"⚡ Readiness: {int(readiness['value'])}/100")
                 if calendar:
@@ -196,12 +197,17 @@ def status(fmt):
                 JournalEntry.energy.isnot(None)
             ).order_by(JournalEntry.date.desc()).first()
 
+            sleep_meta = (latest_sleep.extra_data or {}) if latest_sleep else {}
             result = {
                 "date": today,
                 "last_sleep": {
                     "date": latest_sleep.date if latest_sleep else None,
                     "hours": latest_sleep.value if latest_sleep else None,
-                    "score": (latest_sleep.extra_data or {}).get("score") if latest_sleep else None,
+                    "score": sleep_meta.get("score"),
+                    "deep_sleep_hours": sleep_meta.get("deep_sleep_hours"),
+                    "rem_sleep_hours": sleep_meta.get("rem_sleep_hours"),
+                    "hrv_average": sleep_meta.get("hrv_average"),
+                    "hr_lowest": sleep_meta.get("hr_lowest"),
                 } if latest_sleep else None,
                 "last_readiness": {
                     "date": latest_readiness.date if latest_readiness else None,
@@ -220,7 +226,17 @@ def status(fmt):
                 lines = [f"LifeOS Status — {today}"]
                 if result["last_sleep"]:
                     s = result["last_sleep"]
-                    lines.append(f"💤 Last sleep: {s['hours']:.1f}h (score: {s['score']}) on {s['date']}")
+                    score_str = f" (score: {s['score']})" if s.get("score") else ""
+                    lines.append(f"💤 Last sleep: {s['hours']:.1f}h{score_str} on {s['date']}")
+                    details = []
+                    if s.get("deep_sleep_hours"):
+                        details.append(f"Deep: {s['deep_sleep_hours']:.1f}h")
+                    if s.get("rem_sleep_hours"):
+                        details.append(f"REM: {s['rem_sleep_hours']:.1f}h")
+                    if s.get("hrv_average"):
+                        details.append(f"HRV: {s['hrv_average']}")
+                    if details:
+                        lines.append(f"   {' | '.join(details)}")
                 if result["last_readiness"]:
                     r = result["last_readiness"]
                     lines.append(f"⚡ Readiness: {r['score']}/100 on {r['date']}")
@@ -937,6 +953,316 @@ def log(entry_type, value, note):
     except Exception as e:
         format_error(str(e))
         sys.exit(2)
+
+
+@cli.command()
+@click.option("--days", default=14, help="Days of history to analyze")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="json")
+def trends(days, fmt):
+    """Trend analysis — sleep, readiness, energy over time.
+
+    Pure statistics, no scipy needed. Shows direction, day-of-week
+    patterns, and flags. Useful for Hermes coaching insights.
+    """
+    from .formatters import format_json, format_error
+
+    try:
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        from ..database import SessionLocal, init_db
+        from ..models import DataPoint, JournalEntry
+        init_db()
+        db = SessionLocal()
+        try:
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            data_points = db.query(DataPoint).filter(
+                DataPoint.date >= cutoff, DataPoint.date <= today,
+            ).order_by(DataPoint.date).all()
+
+            energy_entries = db.query(JournalEntry).filter(
+                JournalEntry.date >= cutoff, JournalEntry.date <= today,
+                JournalEntry.energy.isnot(None),
+            ).order_by(JournalEntry.date).all()
+
+            by_date = defaultdict(dict)
+            for dp in data_points:
+                by_date[dp.date][dp.type] = {"value": dp.value, "extra": dp.extra_data or {}}
+            for ej in energy_entries:
+                by_date[ej.date].setdefault("energy_log", [])
+                by_date[ej.date]["energy_log"].append(ej.energy)
+
+            dates_sorted = sorted(by_date.keys())
+            metrics = _extract_metric_series(by_date, dates_sorted)
+
+            trend_results = {}
+            for name, series in metrics.items():
+                if len(series) >= 4:
+                    trend_results[name] = _compute_trend(series)
+
+            result = {
+                "period_days": days,
+                "data_points": len(dates_sorted),
+                "trends": trend_results,
+                "day_of_week": _day_of_week_analysis(by_date),
+                "flags": _compute_flags(metrics),
+            }
+
+            if fmt == "json":
+                click.echo(format_json(result))
+            else:
+                click.echo(_format_trends_text(result))
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@cli.command()
+@click.option("--days", default=30, help="Days of history to analyze")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="json")
+def pattern(days, fmt):
+    """Pattern detection — correlations, trends, day-of-week effects.
+
+    Uses PatternAnalyzer (scipy) if available, falls back to basic
+    trend analysis otherwise. Returns patterns for Hermes coaching.
+    """
+    from .formatters import format_json, format_error
+
+    try:
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        from ..database import SessionLocal, init_db
+        from ..models import DataPoint, JournalEntry
+        init_db()
+        db = SessionLocal()
+        try:
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            data_points = db.query(DataPoint).filter(
+                DataPoint.date >= cutoff, DataPoint.date <= today,
+            ).order_by(DataPoint.date).all()
+
+            energy_entries = db.query(JournalEntry).filter(
+                JournalEntry.date >= cutoff, JournalEntry.date <= today,
+                JournalEntry.energy.isnot(None),
+            ).order_by(JournalEntry.date).all()
+
+            analyzer_data = []
+            for dp in data_points:
+                analyzer_data.append({"date": dp.date, "type": dp.type, "value": dp.value, "metadata": dp.extra_data or {}})
+            energy_by_date = defaultdict(list)
+            for ej in energy_entries:
+                energy_by_date[ej.date].append(ej.energy)
+            for edate, evals in energy_by_date.items():
+                analyzer_data.append({"date": edate, "type": "energy", "value": sum(evals) / len(evals), "metadata": {"log_count": len(evals)}})
+
+            patterns_list = []
+            engine_used = "basic"
+
+            try:
+                from ..pattern_analyzer import PatternAnalyzer as PA
+                analyzer = PA()
+                detected = analyzer.analyze_all(analyzer_data, min_days=5)
+                engine_used = "scipy"
+                for p in detected:
+                    patterns_list.append({"name": p.name, "description": p.description, "type": p.pattern_type, "strength": round(p.strength, 3), "confidence": round(p.confidence, 3), "sample_size": p.sample_size, "actionable": p.actionable, "variables": p.variables})
+            except ImportError:
+                by_fb = defaultdict(dict)
+                for dp in data_points:
+                    by_fb[dp.date][dp.type] = {"value": dp.value, "extra": dp.extra_data or {}}
+                for ej in energy_entries:
+                    by_fb[ej.date].setdefault("energy_log", [])
+                    by_fb[ej.date]["energy_log"].append(ej.energy)
+                dates_fb = sorted(by_fb.keys())
+                metrics_fb = _extract_metric_series(by_fb, dates_fb)
+                for mname, series in metrics_fb.items():
+                    if len(series) < 4:
+                        continue
+                    t = _compute_trend(series)
+                    if t["direction"] != "stable":
+                        patterns_list.append({"name": f"{'Improving' if t['direction'] == 'improving' else 'Declining'} {mname}", "description": f"{mname} {t['direction']}: {t['recent_avg']:.1f} vs {t['prior_avg']:.1f} ({t['change_pct']:+.1f}%)", "type": "trend", "strength": round(abs(t["change_pct"]) / 100, 3), "confidence": min(0.9, len(series) / 30), "sample_size": len(series), "actionable": True, "variables": [mname]})
+
+            by_t = defaultdict(dict)
+            for dp in data_points:
+                by_t[dp.date][dp.type] = {"value": dp.value, "extra": dp.extra_data or {}}
+            for ej in energy_entries:
+                by_t[ej.date].setdefault("energy_log", [])
+                by_t[ej.date]["energy_log"].append(ej.energy)
+            dates_t = sorted(by_t.keys())
+            metrics_t = _extract_metric_series(by_t, dates_t)
+            trend_results = {}
+            for mname, series in metrics_t.items():
+                if len(series) >= 4:
+                    trend_results[mname] = _compute_trend(series)
+
+            result = {"period_days": days, "data_points": len(set(dp.date for dp in data_points)), "engine": engine_used, "patterns": patterns_list, "trends": trend_results, "day_of_week": _day_of_week_analysis(by_t), "flags": _compute_flags(metrics_t)}
+
+            if fmt == "json":
+                click.echo(format_json(result))
+            else:
+                click.echo(_format_pattern_text(result))
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+def _extract_metric_series(by_date, dates_sorted):
+    metrics = {}
+    sleep_scores, readiness_vals, energy_vals, sleep_dur = [], [], [], []
+    for d in dates_sorted:
+        day = by_date[d]
+        if "sleep" in day:
+            score = day["sleep"]["extra"].get("score")
+            if score is not None:
+                sleep_scores.append((d, float(score)))
+            if day["sleep"]["value"] is not None:
+                sleep_dur.append((d, float(day["sleep"]["value"])))
+        if "readiness" in day:
+            readiness_vals.append((d, float(day["readiness"]["value"])))
+        if "energy_log" in day:
+            vals = day["energy_log"]
+            energy_vals.append((d, sum(vals) / len(vals)))
+    if sleep_scores:
+        metrics["sleep_score"] = sleep_scores
+    if sleep_dur:
+        metrics["sleep_hours"] = sleep_dur
+    if readiness_vals:
+        metrics["readiness"] = readiness_vals
+    if energy_vals:
+        metrics["energy"] = energy_vals
+    return metrics
+
+
+def _compute_trend(series):
+    values = [v for _, v in series]
+    n = len(values)
+    mid = n // 2
+    prior = values[:mid]
+    recent = values[mid:]
+    prior_avg = sum(prior) / len(prior) if prior else 0
+    recent_avg = sum(recent) / len(recent) if recent else 0
+    change_pct = ((recent_avg - prior_avg) / prior_avg) * 100 if prior_avg > 0 else 0.0
+    if abs(change_pct) < 3:
+        direction = "stable"
+    elif change_pct > 0:
+        direction = "improving"
+    else:
+        direction = "declining"
+    x_mean = (n - 1) / 2
+    y_mean = sum(values) / n
+    numerator = sum((i - x_mean) * (v - y_mean) for i, v in enumerate(values))
+    denominator = sum((i - x_mean) ** 2 for i in range(n))
+    slope = numerator / denominator if denominator else 0.0
+    return {"direction": direction, "recent_avg": round(recent_avg, 1), "prior_avg": round(prior_avg, 1), "change_pct": round(change_pct, 1), "slope": round(slope, 3), "sample_size": n}
+
+
+def _day_of_week_analysis(by_date):
+    from collections import defaultdict
+    from datetime import datetime as dt
+    dow_values = defaultdict(lambda: defaultdict(list))
+    for d, day_data in by_date.items():
+        try:
+            day_name = dt.strptime(d, "%Y-%m-%d").strftime("%A")
+        except ValueError:
+            continue
+        if "sleep" in day_data and isinstance(day_data["sleep"], dict):
+            score = day_data["sleep"]["extra"].get("score")
+            if score is not None:
+                dow_values["sleep_score"][day_name].append(float(score))
+        if "readiness" in day_data and isinstance(day_data["readiness"], dict):
+            val = day_data["readiness"]["value"]
+            if val is not None:
+                dow_values["readiness"][day_name].append(float(val))
+    result = {}
+    for metric, day_data in dow_values.items():
+        avgs = {day: sum(vals) / len(vals) for day, vals in day_data.items() if vals}
+        if len(avgs) >= 2:
+            best = max(avgs, key=avgs.get)
+            worst = min(avgs, key=avgs.get)
+            result[f"best_{metric}_day"] = best
+            result[f"worst_{metric}_day"] = worst
+            result[f"{metric}_by_day"] = {k: round(v, 1) for k, v in avgs.items()}
+    return result
+
+
+def _compute_flags(metrics):
+    flags = []
+    for metric_name, series in metrics.items():
+        if len(series) < 3:
+            continue
+        values = [v for _, v in series]
+        consecutive_drops = 0
+        for i in range(1, len(values)):
+            if values[i] < values[i - 1]:
+                consecutive_drops += 1
+            else:
+                consecutive_drops = 0
+            if consecutive_drops >= 3:
+                flags.append(f"{metric_name} declining {consecutive_drops + 1} consecutive days")
+                break
+        avg = sum(values) / len(values)
+        latest = values[-1]
+        if avg > 0 and latest < avg * 0.85:
+            pct = round((1 - latest / avg) * 100)
+            flags.append(f"{metric_name} currently {pct}% below average")
+    return flags
+
+
+def _format_trends_text(result):
+    lines = [f"📊 Trends — last {result['period_days']} days ({result['data_points']} data points)", ""]
+    for metric, t in result.get("trends", {}).items():
+        icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(t["direction"], "•")
+        lines.append(f"{icon} {metric}: {t['direction']} ({t['recent_avg']} vs {t['prior_avg']}, {t['change_pct']:+.1f}%)")
+    dow = result.get("day_of_week", {})
+    if dow:
+        lines.append("")
+        lines.append("📅 Day-of-week:")
+        for key, val in dow.items():
+            if key.startswith("best_") or key.startswith("worst_"):
+                lines.append(f"  {key.replace('_', ' ')}: {val}")
+    flags = result.get("flags", [])
+    if flags:
+        lines.append("")
+        lines.append("⚠️ Flags:")
+        for f in flags:
+            lines.append(f"  • {f}")
+    return "\n".join(lines)
+
+
+def _format_pattern_text(result):
+    lines = [f"🔍 Patterns — last {result['period_days']} days ({result['data_points']} data points, engine: {result['engine']})", ""]
+    patterns = result.get("patterns", [])
+    if patterns:
+        for p in patterns:
+            strength_bar = "●" * max(1, int(abs(p.get("strength", 0)) * 5))
+            lines.append(f"  {strength_bar} {p['name']}")
+            lines.append(f"    {p['description']}")
+    else:
+        lines.append("  No significant patterns detected yet.")
+    lines.append("")
+    for metric, t in result.get("trends", {}).items():
+        icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(t["direction"], "•")
+        lines.append(f"{icon} {metric}: {t['direction']} ({t['recent_avg']} vs {t['prior_avg']}, {t['change_pct']:+.1f}%)")
+    dow = result.get("day_of_week", {})
+    if dow:
+        lines.append("")
+        lines.append("📅 Day-of-week:")
+        for key, val in dow.items():
+            if key.startswith("best_") or key.startswith("worst_"):
+                lines.append(f"  {key.replace('_', ' ')}: {val}")
+    flags = result.get("flags", [])
+    if flags:
+        lines.append("")
+        lines.append("⚠️ Flags:")
+        for f in flags:
+            lines.append(f"  • {f}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
