@@ -31,7 +31,7 @@ def brief(date, days, fmt):
     try:
         from datetime import datetime, timedelta, timezone
         from ..database import SessionLocal, init_db
-        from ..models import DataPoint, JournalEntry, CalendarEvent
+        from ..models import DataPoint, JournalEntry, CalendarEvent, Goal
         init_db()
         db = SessionLocal()
         try:
@@ -99,6 +99,30 @@ def brief(date, days, fmt):
             # Day of week
             day_name = datetime.strptime(target_date, "%Y-%m-%d").strftime("%A")
 
+            # Active goals
+            active_goals = db.query(Goal).filter(Goal.status == "active").all()
+            goals_data = []
+            for g in active_goals:
+                days_rem = None
+                if g.target_date:
+                    try:
+                        t = datetime.strptime(g.target_date, "%Y-%m-%d")
+                        days_rem = (t - datetime.strptime(target_date, "%Y-%m-%d")).days
+                    except ValueError:
+                        pass
+                # Determine flag
+                flag = "on_track"
+                if g.predicted_completion and g.target_date:
+                    if g.predicted_completion > g.target_date:
+                        flag = "behind"
+                goals_data.append({
+                    "id": g.id,
+                    "title": g.title,
+                    "progress": g.progress or 0,
+                    "status": flag,
+                    "days_remaining": days_rem,
+                })
+
             result = {
                 "date": target_date,
                 "day": day_name,
@@ -107,6 +131,7 @@ def brief(date, days, fmt):
                 "history_days": len(history),
                 "energy_logs": energy_logs,
                 "calendar": calendar,
+                "goals": goals_data,
             }
 
             if fmt == "json":
@@ -327,6 +352,531 @@ def quest_state(fmt):
         click.echo(f"{p['name']} — Lv.{p['level']} {p['title']} ({p['xp']}xp)")
         click.echo(f"Streaks: {p['streaks']}")
         click.echo(f"History: {len(state['history'])} events")
+
+
+@cli.group()
+def goal():
+    """Track and review goals."""
+    pass
+
+
+@goal.command("list")
+@click.option("--status", type=click.Choice(["active", "all"]), default="active")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def goal_list(status, fmt):
+    """List goals."""
+    from .formatters import format_json, format_error
+
+    try:
+        from ..database import SessionLocal, init_db
+        from ..models import Goal
+        init_db()
+        db = SessionLocal()
+        try:
+            query = db.query(Goal)
+            if status == "active":
+                query = query.filter(Goal.status == "active")
+            goals = query.order_by(Goal.created_at.desc()).all()
+
+            goals_data = [{
+                "id": g.id,
+                "title": g.title,
+                "progress": g.progress or 0,
+                "status": g.status,
+                "category": g.category,
+                "target_date": g.target_date,
+            } for g in goals]
+
+            if fmt == "json":
+                click.echo(format_json({"goals": goals_data}))
+            else:
+                if not goals_data:
+                    click.echo("No goals found.")
+                    return
+                for g in goals_data:
+                    pct = int(g["progress"])
+                    target = f" -> {g['target_date']}" if g["target_date"] else ""
+                    click.echo(f"  [{g['id']}] {g['title']} ({pct}%){target}")
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@goal.command("add")
+@click.argument("title")
+@click.option("--target-date", default=None, help="Target date YYYY-MM-DD")
+@click.option("--description", default=None)
+@click.option("--category", default=None)
+def goal_add(title, target_date, description, category):
+    """Add a new goal (creates an epic quest too)."""
+    from .formatters import format_error
+    from .sidekick import load_state, save_state, add_quest
+
+    try:
+        from ..database import SessionLocal, init_db
+        from ..models import Goal
+        init_db()
+        db = SessionLocal()
+        try:
+            g = Goal(
+                title=title,
+                description=description,
+                target_date=target_date,
+                category=category,
+                status="active",
+                progress=0.0,
+                actual_hours=0.0,
+                tags=[],
+            )
+            db.add(g)
+            db.commit()
+            db.refresh(g)
+
+            # Create epic quest in sidekick
+            state = load_state()
+            state, quest_id = add_quest(
+                state, f"Goal: {title}", "epic",
+                xp=300, tags=[category or "goal"],
+            )
+            # Store quest_id on the goal for later completion
+            g.extra_data = {"quest_id": quest_id}
+            db.commit()
+            save_state(state)
+
+            click.echo(f"Goal created: [{g.id}] {title}")
+            click.echo(f"Epic quest: {quest_id} (+300xp on completion)")
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@goal.command("update")
+@click.argument("goal_id", type=int)
+@click.option("--progress", type=int, default=None, help="Progress 0-100")
+@click.option("--status", "new_status", type=click.Choice(["active", "completed", "paused"]), default=None)
+@click.option("--note", default=None)
+def goal_update(goal_id, progress, new_status, note):
+    """Update goal progress or status."""
+    from .formatters import format_error
+    from .sidekick import load_state, save_state, complete_quest
+
+    try:
+        from datetime import datetime, timezone
+        from ..database import SessionLocal, init_db
+        from ..models import Goal
+        init_db()
+        db = SessionLocal()
+        try:
+            g = db.query(Goal).filter(Goal.id == goal_id).first()
+            if not g:
+                click.echo(f"Goal {goal_id} not found.", err=True)
+                sys.exit(1)
+
+            if progress is not None:
+                g.progress = float(progress)
+            if new_status is not None:
+                g.status = new_status
+            if note:
+                meta = g.extra_data or {}
+                notes = meta.get("notes", [])
+                notes.append({"text": note, "at": datetime.now(timezone.utc).isoformat()})
+                meta["notes"] = notes
+                g.extra_data = meta
+
+            # Auto-complete if progress hits 100 or status set to completed
+            completed = (progress is not None and progress >= 100) or new_status == "completed"
+            if completed:
+                g.status = "completed"
+                g.progress = 100.0
+                # Complete the linked epic quest
+                quest_id = (g.extra_data or {}).get("quest_id")
+                if quest_id:
+                    state = load_state()
+                    state = complete_quest(state, quest_id)
+                    save_state(state)
+                    click.echo("Epic quest completed! XP awarded.")
+
+            db.commit()
+            click.echo(f"Goal [{g.id}] updated: {g.title} ({int(g.progress)}%, {g.status})")
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@goal.command("show")
+@click.argument("goal_id", type=int)
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def goal_show(goal_id, fmt):
+    """Show goal details."""
+    from .formatters import format_json, format_error
+
+    try:
+        from ..database import SessionLocal, init_db
+        from ..models import Goal, Milestone
+        init_db()
+        db = SessionLocal()
+        try:
+            g = db.query(Goal).filter(Goal.id == goal_id).first()
+            if not g:
+                click.echo(f"Goal {goal_id} not found.", err=True)
+                sys.exit(1)
+
+            milestones = db.query(Milestone).filter(
+                Milestone.goal_id == goal_id
+            ).order_by(Milestone.order).all()
+
+            data = {
+                "id": g.id,
+                "title": g.title,
+                "description": g.description,
+                "progress": g.progress or 0,
+                "status": g.status,
+                "category": g.category,
+                "target_date": g.target_date,
+                "velocity": g.velocity,
+                "predicted_completion": g.predicted_completion,
+                "created_at": str(g.created_at),
+                "milestones": [{
+                    "id": m.id,
+                    "title": m.title,
+                    "status": m.status,
+                    "order": m.order,
+                } for m in milestones],
+            }
+
+            if fmt == "json":
+                click.echo(format_json(data))
+            else:
+                click.echo(f"[{g.id}] {g.title}")
+                click.echo(f"  Status: {g.status} | Progress: {int(g.progress or 0)}%")
+                if g.target_date:
+                    click.echo(f"  Target: {g.target_date}")
+                if g.category:
+                    click.echo(f"  Category: {g.category}")
+                if g.description:
+                    click.echo(f"  {g.description}")
+                if milestones:
+                    click.echo("  Milestones:")
+                    for m in milestones:
+                        mark = "x" if m.status == "completed" else " "
+                        click.echo(f"    [{mark}] {m.title}")
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@goal.command("review")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def goal_review(fmt):
+    """Review active goals — velocity, predictions, status flags. No LLM."""
+    from .formatters import format_json, format_error
+
+    try:
+        from datetime import datetime, timedelta, timezone
+        from ..database import SessionLocal, init_db
+        from ..models import Goal
+        init_db()
+        db = SessionLocal()
+        try:
+            goals = db.query(Goal).filter(Goal.status == "active").order_by(Goal.created_at).all()
+
+            if not goals:
+                click.echo("No active goals.")
+                return
+
+            now = datetime.now(timezone.utc)
+            reviews = []
+
+            for g in goals:
+                progress = g.progress or 0.0
+                created = g.created_at
+                if created and created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+
+                # Weeks elapsed since creation
+                weeks_elapsed = (now - created).days / 7 if created else 0
+                velocity_pct = progress / max(weeks_elapsed, 0.1)  # %/week
+
+                # Days remaining
+                days_remaining = None
+                if g.target_date:
+                    try:
+                        target = datetime.strptime(g.target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        days_remaining = (target - now).days
+                    except ValueError:
+                        pass
+
+                # Predicted completion
+                predicted = None
+                if velocity_pct > 0 and progress < 100:
+                    weeks_to_go = (100 - progress) / velocity_pct
+                    predicted_date = now + timedelta(weeks=weeks_to_go)
+                    predicted = predicted_date.strftime("%Y-%m-%d")
+
+                # Status flag
+                flag = "on_track"
+                if days_remaining is not None and predicted:
+                    try:
+                        pred_dt = datetime.strptime(predicted, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        target_dt = datetime.strptime(g.target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        if pred_dt > target_dt:
+                            flag = "behind"
+                    except ValueError:
+                        pass
+                elif velocity_pct == 0 and progress == 0:
+                    flag = "not_started"
+
+                # Last update
+                updated = g.updated_at
+                if updated and updated.tzinfo is None:
+                    updated = updated.replace(tzinfo=timezone.utc)
+                days_since_update = (now - updated).days if updated else None
+
+                review = {
+                    "id": g.id,
+                    "title": g.title,
+                    "progress": round(progress, 1),
+                    "target_date": g.target_date,
+                    "days_remaining": days_remaining,
+                    "velocity_pct_per_week": round(velocity_pct, 1),
+                    "predicted_completion": predicted,
+                    "flag": flag,
+                    "days_since_update": days_since_update,
+                }
+                reviews.append(review)
+
+            if fmt == "json":
+                click.echo(format_json({"reviews": reviews}))
+            else:
+                for r in reviews:
+                    target_str = f" -> target {r['target_date']}" if r["target_date"] else ""
+                    click.echo(f"\n  [{r['id']}] {r['title']} ({r['progress']}%{target_str})")
+                    click.echo(f"    Velocity: {r['velocity_pct_per_week']}%/week", nl=False)
+                    if r["predicted_completion"]:
+                        flag_icon = {"on_track": "OK", "behind": "BEHIND", "not_started": "NEW"}.get(r["flag"], "?")
+                        click.echo(f" -> predicted {r['predicted_completion']} [{flag_icon}]")
+                    else:
+                        click.echo(" -> no prediction yet")
+                    if r["days_since_update"] and r["days_since_update"] > 7:
+                        click.echo(f"    Last update: {r['days_since_update']} days ago — stalled?")
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@cli.command()
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def weekly(fmt):
+    """Weekly review — data-driven summary of the past 7 days. No LLM."""
+    from .formatters import format_json, format_error
+    from .sidekick import load_state, save_state, check_achievements, get_level
+
+    try:
+        from datetime import datetime, timedelta, timezone as tz
+        from ..database import SessionLocal, init_db
+        from ..models import DataPoint, JournalEntry
+        init_db()
+        db = SessionLocal()
+        try:
+            today = datetime.now(tz.utc).strftime("%Y-%m-%d")
+            week_start = (datetime.now(tz.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+
+            # --- Sleep ---
+            sleep_rows = db.query(DataPoint).filter(
+                DataPoint.type == "sleep",
+                DataPoint.date >= week_start,
+                DataPoint.date <= today,
+            ).all()
+            sleep_scores = []
+            for dp in sleep_rows:
+                score = (dp.extra_data or {}).get("score")
+                if score is not None:
+                    sleep_scores.append({"date": dp.date, "score": score})
+            sleep_scores.sort(key=lambda x: x["score"])
+            sleep_avg = round(sum(s["score"] for s in sleep_scores) / len(sleep_scores)) if sleep_scores else None
+            sleep_best = sleep_scores[-1] if sleep_scores else None
+            sleep_worst = sleep_scores[0] if sleep_scores else None
+            sleep_trend = None
+            if len(sleep_scores) >= 4:
+                first_half = sum(s["score"] for s in sleep_scores[:len(sleep_scores)//2]) / (len(sleep_scores)//2)
+                second_half = sum(s["score"] for s in sleep_scores[len(sleep_scores)//2:]) / (len(sleep_scores) - len(sleep_scores)//2)
+                sleep_trend = "improving" if second_half > first_half + 2 else ("declining" if first_half > second_half + 2 else "stable")
+
+            # --- Readiness ---
+            readiness_rows = db.query(DataPoint).filter(
+                DataPoint.type == "readiness",
+                DataPoint.date >= week_start,
+                DataPoint.date <= today,
+            ).all()
+            readiness_scores = [{"date": dp.date, "score": int(dp.value)} for dp in readiness_rows if dp.value]
+            readiness_scores.sort(key=lambda x: x["score"])
+            readiness_avg = round(sum(r["score"] for r in readiness_scores) / len(readiness_scores)) if readiness_scores else None
+            readiness_best = readiness_scores[-1] if readiness_scores else None
+            readiness_worst = readiness_scores[0] if readiness_scores else None
+            readiness_trend = None
+            if len(readiness_scores) >= 4:
+                first_half = sum(r["score"] for r in readiness_scores[:len(readiness_scores)//2]) / (len(readiness_scores)//2)
+                second_half = sum(r["score"] for r in readiness_scores[len(readiness_scores)//2:]) / (len(readiness_scores) - len(readiness_scores)//2)
+                readiness_trend = "improving" if second_half > first_half + 2 else ("declining" if first_half > second_half + 2 else "stable")
+
+            # --- Energy ---
+            energy_rows = db.query(JournalEntry).filter(
+                JournalEntry.date >= week_start,
+                JournalEntry.date <= today,
+                JournalEntry.energy.isnot(None),
+            ).all()
+            energy_entries = [{"date": e.date, "energy": e.energy} for e in energy_rows]
+            energy_entries.sort(key=lambda x: x["energy"])
+            energy_avg = round(sum(e["energy"] for e in energy_entries) / len(energy_entries), 1) if energy_entries else None
+            energy_best = energy_entries[-1] if energy_entries else None
+            energy_worst = energy_entries[0] if energy_entries else None
+
+            # --- Quest summary ---
+            state = load_state()
+            completed_this_week = []
+            xp_this_week = 0
+            for qtype in ["daily", "weekly", "epic"]:
+                for q in state["quests"][qtype]:
+                    if q["status"] == "completed" and q.get("completed"):
+                        comp_date = q["completed"][:10]
+                        if comp_date >= week_start:
+                            completed_this_week.append(q)
+            for h in state["history"]:
+                if h.get("date", "") >= week_start and h["event"] == "xp_awarded":
+                    xp_this_week += h.get("xp", 0)
+            level, title, next_xp = get_level(state["player"]["xp"])
+            progress_to_next = None
+            if next_xp:
+                from .sidekick import LEVELS
+                prev_xp = LEVELS[level - 1][0]
+                progress_to_next = round((state["player"]["xp"] - prev_xp) / (next_xp - prev_xp) * 100)
+
+            # --- Week score ---
+            sleep_component = (sleep_avg / 100 * 40) if sleep_avg else 0
+            readiness_component = (readiness_avg / 100 * 30) if readiness_avg else 0
+            active_count = sum(
+                1 for qtype in ["daily", "weekly", "epic"]
+                for q in state["quests"][qtype] if q["status"] == "active"
+            )
+            total_quest_pool = len(completed_this_week) + active_count
+            quest_rate = (len(completed_this_week) / total_quest_pool) if total_quest_pool > 0 else 0
+            quest_component = quest_rate * 15
+            energy_days = len(set(e["date"] for e in energy_entries))
+            energy_component = (energy_days / 7) * 15
+            week_score = round(sleep_component + readiness_component + quest_component + energy_component)
+
+            # --- Check achievements ---
+            newly_unlocked = check_achievements(state, week_score=week_score)
+            save_state(state)
+
+            result = {
+                "week": {"start": week_start, "end": today},
+                "sleep": {
+                    "avg_score": sleep_avg,
+                    "best": sleep_best,
+                    "worst": sleep_worst,
+                    "trend": sleep_trend,
+                    "nights_tracked": len(sleep_scores),
+                },
+                "readiness": {
+                    "avg_score": readiness_avg,
+                    "best": readiness_best,
+                    "worst": readiness_worst,
+                    "trend": readiness_trend,
+                    "days_tracked": len(readiness_scores),
+                },
+                "energy": {
+                    "avg_rating": energy_avg,
+                    "best": energy_best,
+                    "worst": energy_worst,
+                    "logs_count": len(energy_entries),
+                },
+                "quests": {
+                    "completed": len(completed_this_week),
+                    "xp_earned": xp_this_week,
+                    "level": level,
+                    "title": title,
+                    "progress_to_next": progress_to_next,
+                    "streak": state["player"]["streaks"],
+                },
+                "achievements_unlocked": newly_unlocked,
+                "week_score": week_score,
+            }
+
+            if fmt == "json":
+                click.echo(format_json(result))
+            else:
+                lines = [f"Weekly Review — {week_start} to {today}"]
+                lines.append(f"Week Score: {week_score}/100")
+                lines.append("")
+                if sleep_avg:
+                    lines.append(f"Sleep: avg {sleep_avg}/100 | trend: {sleep_trend or 'n/a'} | {len(sleep_scores)} nights")
+                    if sleep_best:
+                        lines.append(f"  Best: {sleep_best['date']} ({sleep_best['score']})")
+                    if sleep_worst:
+                        lines.append(f"  Worst: {sleep_worst['date']} ({sleep_worst['score']})")
+                else:
+                    lines.append("Sleep: no data")
+                if readiness_avg:
+                    lines.append(f"Readiness: avg {readiness_avg}/100 | trend: {readiness_trend or 'n/a'} | {len(readiness_scores)} days")
+                    if readiness_best:
+                        lines.append(f"  Best: {readiness_best['date']} ({readiness_best['score']})")
+                    if readiness_worst:
+                        lines.append(f"  Worst: {readiness_worst['date']} ({readiness_worst['score']})")
+                else:
+                    lines.append("Readiness: no data")
+                if energy_avg:
+                    lines.append(f"Energy: avg {energy_avg}/5 | {len(energy_entries)} logs")
+                    if energy_best:
+                        lines.append(f"  Best: {energy_best['date']} ({energy_best['energy']}/5)")
+                    if energy_worst:
+                        lines.append(f"  Worst: {energy_worst['date']} ({energy_worst['energy']}/5)")
+                else:
+                    lines.append("Energy: no logs")
+                lines.append(f"Quests: {len(completed_this_week)} completed | +{xp_this_week}xp")
+                lines.append(f"Level: {level} {title} | progress: {progress_to_next or 0}%")
+                if newly_unlocked:
+                    lines.append(f"New achievements: {', '.join(newly_unlocked)}")
+                click.echo("\n".join(lines))
+        finally:
+            db.close()
+    except Exception as e:
+        format_error(str(e))
+        sys.exit(2)
+
+
+@cli.command()
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text")
+def achievements(fmt):
+    """Show achievement status — unlocked and locked."""
+    from .formatters import format_json
+    from .sidekick import load_state, ACHIEVEMENTS, get_achievements_display
+
+    state = load_state()
+    if fmt == "json":
+        unlocked = set(state["player"].get("achievements", []))
+        data = {
+            "unlocked": [
+                {"id": aid, **info} for aid, info in ACHIEVEMENTS.items() if aid in unlocked
+            ],
+            "locked": [
+                {"id": aid, **info} for aid, info in ACHIEVEMENTS.items() if aid not in unlocked
+            ],
+            "progress": f"{len(unlocked)}/{len(ACHIEVEMENTS)}",
+        }
+        click.echo(format_json(data))
+    else:
+        click.echo(get_achievements_display(state))
 
 
 @cli.command()
