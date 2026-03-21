@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "bun",
+      "args": ["./lifeos-channel.ts"]
+    }
+  }
+}
