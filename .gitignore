@@ -53,3 +53,5 @@ htmlcov/
 # bv (beads viewer) local config and caches
 .bv/
 channel/node_modules/
+channel/.env
+# Telegram bot token
